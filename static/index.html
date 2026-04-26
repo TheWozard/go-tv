@@ -11,7 +11,30 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
-    #player-wrapper { position: fixed; inset: 0; }
+    #start-screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #play-btn {
+      background: none;
+      border: 2px solid #444;
+      color: #888;
+      font-size: 2.5rem;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding-left: 6px;
+      transition: border-color .2s, color .2s;
+    }
+    #play-btn:hover { border-color: #aaa; color: #ddd; }
+    #player-wrapper { position: fixed; inset: 0; display: none; }
     #player-wrapper iframe { width: 100%; height: 100%; border: none; }
     #edit-link {
       position: fixed;
@@ -34,6 +57,9 @@
   </style>
 </head>
 <body>
+  <div id="start-screen">
+    <button id="play-btn">&#9654;</button>
+  </div>
   <div id="player-wrapper">
     <div id="player"></div>
   </div>
@@ -59,10 +85,9 @@
     // YT.Player instance — undefined until onYouTubeIframeAPIReady fires.
     let player;
 
-    // Unmute on the first click anywhere on the page.
-    document.addEventListener('click', () => {
-      player?.unMute();
-    }, { once: true });
+    // Resolves when the YT IFrame API is ready.
+    let resolveYtReady;
+    const ytReady = new Promise(resolve => { resolveYtReady = resolve; });
 
     // The video ID currently loaded in the player. Used to detect when
     // applyState() needs to swap to a different video vs. just seek.
@@ -233,10 +258,17 @@
 
     document.addEventListener('mousemove', showEdit);
 
-    window.onYouTubeIframeAPIReady = async function () {
+    window.onYouTubeIframeAPIReady = function () {
+      resolveYtReady();
+    };
+
+    document.getElementById('play-btn').addEventListener('click', async () => {
+      document.getElementById('start-screen').style.display = 'none';
+      document.getElementById('player-wrapper').style.display = 'block';
+
       let state;
       try {
-        state = await fetchState();
+        [, state] = await Promise.all([ytReady, fetchState()]);
       } catch (e) {
         return;
       }
@@ -248,19 +280,18 @@
         videoId: state.video_id,
         playerVars: {
           start: Math.floor(state.seconds),
+          autoplay: 1,
         },
         events: {
-          // Natural end of video (or past stop_seconds if end param not set).
           onStateChange(event) {
             if (event.data === YT.PlayerState.ENDED) advance();
           },
-          // Skip unplayable videos (removed, embedding disabled, bad ID, etc.).
           onError() {
             advance();
           },
         },
       });
-    };
+    });
   </script>
   <script src="https://www.youtube.com/iframe_api" async></script>
 </body>

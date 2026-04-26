@@ -11,6 +11,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"go-tv/internal/player"
+	"go-tv/internal/player/homeassistant"
 	"go-tv/internal/schedule"
 	"go-tv/internal/server"
 	"go-tv/internal/state"
@@ -18,7 +20,10 @@ import (
 
 func main() {
 	scheduleFile := flag.String("schedule", "schedule.json", "path to schedule file")
-	stateFile := flag.String("state", "state.json", "path to state file")
+	stateFile    := flag.String("state", "state.json", "path to state file")
+	haURL        := flag.String("ha-url", "", "Home Assistant base URL (e.g. http://homeassistant.local:8123)")
+	haToken      := flag.String("ha-token", "", "Home Assistant long-lived access token")
+	haEntity     := flag.String("ha-entity", "", "Home Assistant media_player entity ID")
 	flag.Parse()
 
 	schedule, err := schedule.Load(*scheduleFile)
@@ -45,6 +50,17 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	if *haURL != "" && *haToken != "" && *haEntity != "" {
+		p := homeassistant.New(homeassistant.Config{
+			URL:      *haURL,
+			Token:    *haToken,
+			EntityID: *haEntity,
+		})
+		go player.Run(ctx, p, schedule, currentState)
+		log.Printf("Home Assistant player active: %s", *haEntity)
+	}
+
 	<-ctx.Done()
 
 	log.Println("Shutting down…")
