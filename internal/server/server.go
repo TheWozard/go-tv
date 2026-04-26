@@ -35,14 +35,19 @@ type jumpRequest struct {
 	Seconds float64 `json:"seconds"`
 }
 
-// scheduleItem is the wire format for a single video in the schedule API.
-// Seconds values are used instead of duration strings for easy JS consumption.
+// scheduleVideo is the wire format for a single video within an item.
+type scheduleVideo struct {
+	ID            string  `json:"id,omitempty"`
+	Title         string  `json:"title,omitempty"`
+	StartSeconds  float64 `json:"start_seconds,omitempty"`
+	StopSeconds   float64 `json:"stop_seconds,omitempty"`
+	LengthSeconds float64 `json:"length_seconds,omitempty"`
+}
+
+// scheduleItem is the wire format for a schedule item (named group of videos).
 type scheduleItem struct {
-	ID            string  `json:"id"`
-	Title         string  `json:"title"`
-	StartSeconds  float64 `json:"start_seconds"`
-	StopSeconds   float64 `json:"stop_seconds"`
-	LengthSeconds float64 `json:"length_seconds"`
+	Name   string          `json:"name"`
+	Videos []scheduleVideo `json:"videos"`
 }
 
 // -------------------------------------------------------------------------
@@ -83,33 +88,48 @@ func currentState(sched *schedule.Schedule, st *state.State) (stateResponse, boo
 	}, true
 }
 
-func videoToItem(v schedule.Video) scheduleItem {
-	item := scheduleItem{
+func videoToWire(v schedule.Video) scheduleVideo {
+	w := scheduleVideo{
 		ID:            v.ID,
 		Title:         v.Title,
 		StartSeconds:  v.StartSeconds(),
 		StopSeconds:   v.Stop.Seconds(),
 		LengthSeconds: v.Length.Seconds(),
 	}
-	// If stop is unset, fall back to length so the slider is usable.
-	if item.StopSeconds == 0 {
-		item.StopSeconds = item.LengthSeconds
+	if w.StopSeconds == 0 {
+		w.StopSeconds = w.LengthSeconds
 	}
-	return item
+	return w
 }
 
-func itemToVideo(item scheduleItem) schedule.Video {
+func wireToVideo(w scheduleVideo) schedule.Video {
 	v := schedule.Video{
-		ID:     item.ID,
-		Title:  item.Title,
-		Stop:   schedule.Duration{Duration: time.Duration(item.StopSeconds * float64(time.Second)).Truncate(time.Second)},
-		Length: schedule.Duration{Duration: time.Duration(item.LengthSeconds * float64(time.Second)).Truncate(time.Second)},
+		ID:     w.ID,
+		Title:  w.Title,
+		Stop:   schedule.Duration{Duration: time.Duration(w.StopSeconds * float64(time.Second)).Truncate(time.Second)},
+		Length: schedule.Duration{Duration: time.Duration(w.LengthSeconds * float64(time.Second)).Truncate(time.Second)},
 	}
-	if item.StartSeconds > 0 {
-		d := schedule.Duration{Duration: time.Duration(item.StartSeconds * float64(time.Second)).Truncate(time.Second)}
+	if w.StartSeconds > 0 {
+		d := schedule.Duration{Duration: time.Duration(w.StartSeconds * float64(time.Second)).Truncate(time.Second)}
 		v.Start = &d
 	}
 	return v
+}
+
+func itemToWire(it schedule.Item) scheduleItem {
+	videos := make([]scheduleVideo, len(it.Videos))
+	for i, v := range it.Videos {
+		videos[i] = videoToWire(v)
+	}
+	return scheduleItem{Name: it.Name, Videos: videos}
+}
+
+func wireToItem(w scheduleItem) schedule.Item {
+	videos := make([]schedule.Video, len(w.Videos))
+	for i, v := range w.Videos {
+		videos[i] = wireToVideo(v)
+	}
+	return schedule.Item{Name: w.Name, Videos: videos}
 }
 
 // -------------------------------------------------------------------------
@@ -135,29 +155,29 @@ func stateHandler(sched *schedule.Schedule, st *state.State) http.HandlerFunc {
 
 func scheduleGetHandler(sched *schedule.Schedule) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		videos := sched.All()
-		items := make([]scheduleItem, len(videos))
-		for i, v := range videos {
-			items[i] = videoToItem(v)
+		its := sched.AllItems()
+		entries := make([]scheduleItem, len(its))
+		for i, it := range its {
+			entries[i] = itemToWire(it)
 		}
-		writeJSON(w, map[string]any{"videos": items}, http.StatusOK)
+		writeJSON(w, map[string]any{"items": entries}, http.StatusOK)
 	}
 }
 
 func schedulePostHandler(sched *schedule.Schedule, schedPath string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			Videos []scheduleItem `json:"videos"`
+			Items []scheduleItem `json:"items"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			http.Error(w, "invalid body", http.StatusBadRequest)
 			return
 		}
-		videos := make([]schedule.Video, len(body.Videos))
-		for i, item := range body.Videos {
-			videos[i] = itemToVideo(item)
+		items := make([]schedule.Item, len(body.Items))
+		for i, entry := range body.Items {
+			items[i] = wireToItem(entry)
 		}
-		sched.Update(videos)
+		sched.Update(items)
 		if err := sched.Save(schedPath); err != nil {
 			http.Error(w, "failed to save schedule", http.StatusInternalServerError)
 			return

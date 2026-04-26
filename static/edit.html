@@ -188,6 +188,54 @@
     .play-btn:hover { color: #ccc; }
     .card.active .play-btn { color: #22c55e; }
 
+    /* ---- set group ---- */
+    .set-item { list-style: none; }
+    .set-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px 6px 0;
+      border-bottom: 1px solid #222;
+      margin-bottom: 8px;
+    }
+    .set-toggle {
+      background: none;
+      border: none;
+      color: #555;
+      cursor: pointer;
+      font-size: .65rem;
+      padding: 0 2px;
+      line-height: 1;
+      flex-shrink: 0;
+      transition: transform .15s;
+    }
+    .set-item:not(.collapsed) .set-toggle { transform: rotate(90deg); }
+    .set-name-input {
+      background: none;
+      border: none;
+      color: #888;
+      font-size: .85rem;
+      font-weight: 500;
+      font-family: inherit;
+      flex: 1;
+      outline: none;
+      padding: 2px 4px;
+      border-bottom: 1px solid transparent;
+    }
+    .set-name-input:focus { color: #ccc; border-bottom-color: #2563eb; }
+    .set-videos {
+      list-style: none;
+      padding-left: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .set-item.collapsed .set-videos { display: none; }
+    .set-item.collapsed .set-header  { border-bottom: none; margin-bottom: 0; }
+    .set-item.active-set > .set-header { border-bottom-color: #22c55e44; }
+    .set-item.active-set > .set-header .set-name-input { color: #22c55e; }
+
     /* ---- position slider ---- */
     .pos-wrap {
       margin-top: 10px;
@@ -212,7 +260,7 @@
 </ul>
 
 <script>
-  let videos = [];  // working copy
+  let items = [];   // working copy — array of video-items or set-items
   let dirty = false;
 
   const list = document.getElementById('video-list');
@@ -225,7 +273,7 @@
     const res = await fetch('/api/schedule');
     if (!res.ok) throw new Error('failed to load schedule');
     const data = await res.json();
-    return data.videos ?? [];
+    return data.items ?? [];
   }
 
   async function loadState() {
@@ -246,11 +294,11 @@
     return res.json();
   }
 
-  async function saveSchedule(videos) {
+  async function saveSchedule(items) {
     const res = await fetch('/api/schedule', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ videos }),
+      body: JSON.stringify({ items }),
     });
     if (!res.ok) throw new Error('failed to save');
   }
@@ -275,6 +323,19 @@
         dirty = false;
       } catch {}
     }, 800);
+  }
+
+  // -----------------------------------------------------------------------
+  // Item helpers
+  // -----------------------------------------------------------------------
+
+  // Returns a live reference into items[] so mutations propagate.
+  function findVideoById(id) {
+    for (const item of items) {
+      const v = item.videos.find(v => v.id === id);
+      if (v) return v;
+    }
+    return null;
   }
 
   // -----------------------------------------------------------------------
@@ -308,6 +369,8 @@
       if (prev) {
         prev.querySelector('.pos-wrap').style.display = 'none';
         prev.classList.remove('active');
+        const prevSet = prev.closest('.set-item');
+        if (prevSet) prevSet.classList.remove('active-set');
       }
     }
     activeVideoId = videoId;
@@ -317,6 +380,10 @@
     updatePosSlider(card);
     card.querySelector('.pos-wrap').style.display = '';
     card.classList.add('active');
+    const setItem = card.closest('.set-item');
+    if (setItem) {
+      setItem.classList.add('active-set');
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -471,18 +538,19 @@
   // -----------------------------------------------------------------------
 
   function syncVideoFromCard(card) {
-    const id = card.dataset.id;
-    const v  = videos.find(v => v.id === id);
+    const v = findVideoById(card.dataset.id);
     if (!v) return;
     v.start_seconds = parseFloat(card.querySelector('.start-range').value);
     v.stop_seconds  = parseFloat(card.querySelector('.stop-range').value);
   }
 
   function collectOrder() {
-    return [...list.querySelectorAll('.card')].map(card => {
-      const id = card.dataset.id;
-      return videos.find(v => v.id === id);
-    }).filter(Boolean);
+    return [...list.querySelectorAll(':scope > .set-item')].map(el => ({
+      name: el.querySelector('.set-name-input').value,
+      videos: [...el.querySelectorAll(':scope > .set-videos > .card')]
+        .map(card => findVideoById(card.dataset.id))
+        .filter(Boolean),
+    }));
   }
 
   // -----------------------------------------------------------------------
@@ -491,30 +559,34 @@
 
   let dragSrc = null;
 
-  function initDrag(card) {
-    const handle = card.querySelector('.handle');
+  // Works for both top-level items (cards or set-items) and cards within a set.
+  // Drag is restricted to siblings within the same parent container.
+  function initDrag(el) {
+    const handle = el.querySelector('.handle');
 
-    handle.addEventListener('mousedown', () => { card.draggable = true; });
-    card.addEventListener('dragend', () => {
-      card.draggable = false;
-      card.classList.remove('dragging', 'drag-over');
-      list.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
+    handle.addEventListener('mousedown', () => { el.draggable = true; });
+    el.addEventListener('dragend', () => {
+      el.draggable = false;
+      el.classList.remove('dragging', 'drag-over');
+      if (el.parentNode) [...el.parentNode.children].forEach(c => c.classList.remove('drag-over'));
       dragSrc = null;
     });
-    card.addEventListener('dragstart', e => {
-      dragSrc = card;
+    el.addEventListener('dragstart', e => {
+      e.stopPropagation();
+      dragSrc = el;
       e.dataTransfer.effectAllowed = 'move';
-      card.classList.add('dragging');
+      el.classList.add('dragging');
     });
-    card.addEventListener('dragover', e => {
+    el.addEventListener('dragover', e => {
       e.preventDefault();
-      if (!dragSrc || dragSrc === card) return;
-      list.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
-      card.classList.add('drag-over');
-      const items = [...list.querySelectorAll('.card')];
-      const srcIdx = items.indexOf(dragSrc);
-      const dstIdx = items.indexOf(card);
-      list.insertBefore(dragSrc, srcIdx < dstIdx ? card.nextSibling : card);
+      e.stopPropagation();
+      if (!dragSrc || dragSrc === el || dragSrc.parentNode !== el.parentNode) return;
+      [...el.parentNode.children].forEach(c => c.classList.remove('drag-over'));
+      el.classList.add('drag-over');
+      const siblings = [...el.parentNode.children];
+      const srcIdx = siblings.indexOf(dragSrc);
+      const dstIdx = siblings.indexOf(el);
+      el.parentNode.insertBefore(dragSrc, srcIdx < dstIdx ? el.nextSibling : el);
       markDirty();
     });
   }
@@ -523,14 +595,39 @@
   // Render
   // -----------------------------------------------------------------------
 
+  function buildSetItem(set) {
+    const li = document.createElement('li');
+    li.className = 'set-item collapsed';
+
+    li.innerHTML = `
+      <div class="set-header">
+        <div class="handle text-faint" title="drag to reorder">⠿</div>
+        <button class="set-toggle" title="collapse/expand">▶</button>
+        <input class="set-name-input" type="text" value="${escHtml(set.name)}">
+      </div>
+      <ul class="set-videos"></ul>`;
+
+    const videoList = li.querySelector('.set-videos');
+    (set.videos ?? []).forEach(v => videoList.appendChild(buildCard(v)));
+
+    li.querySelector('.set-toggle').addEventListener('click', () => li.classList.toggle('collapsed'));
+    li.querySelector('.set-name-input').addEventListener('input', markDirty);
+    li.querySelectorAll('input').forEach(input => {
+      input.addEventListener('mousedown', e => e.stopPropagation());
+    });
+
+    initDrag(li);
+    return li;
+  }
+
   function render(data) {
-    videos = data;
+    items = data;
     list.innerHTML = '';
-    if (!videos.length) {
-      list.innerHTML = '<li id="status" class="text-muted">No videos in schedule.</li>';
+    if (!items.length) {
+      list.innerHTML = '<li id="status" class="text-muted">No items in schedule.</li>';
       return;
     }
-    videos.forEach(v => list.appendChild(buildCard(v)));
+    items.forEach(item => list.appendChild(buildSetItem(item)));
   }
 
   // -----------------------------------------------------------------------

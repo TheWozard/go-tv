@@ -29,15 +29,15 @@ func (d Duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.Duration.String())
 }
 
+// Video is a single playable entry.
 type Video struct {
 	ID     string    `json:"id"`
 	Title  string    `json:"title,omitempty"`
-	Start  *Duration `json:"start,omitempty"` // nil means start from 0
+	Start  *Duration `json:"start,omitempty"`
 	Stop   Duration  `json:"stop"`
-	Length Duration  `json:"length"` // total video duration; used as slider max
+	Length Duration  `json:"length"`
 }
 
-// StartSeconds returns the start offset in seconds, defaulting to 0.
 func (v *Video) StartSeconds() float64 {
 	if v.Start == nil {
 		return 0
@@ -45,9 +45,16 @@ func (v *Video) StartSeconds() float64 {
 	return v.Start.Seconds()
 }
 
-type Schedule struct {
-	mu     sync.RWMutex
+// Item is a named group of one or more videos.
+// Single-video imports produce an Item with one entry in Videos.
+type Item struct {
+	Name   string  `json:"name"`
 	Videos []Video `json:"videos"`
+}
+
+type Schedule struct {
+	mu    sync.RWMutex
+	Items []Item `json:"items"`
 }
 
 func Load(path string) (*Schedule, error) {
@@ -76,37 +83,56 @@ func (s *Schedule) Save(path string) error {
 	return enc.Encode(s)
 }
 
-// All returns a shallow copy of the video slice, safe for reading concurrently.
-func (s *Schedule) All() []Video {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	out := make([]Video, len(s.Videos))
-	copy(out, s.Videos)
+// flat returns all videos in playback order. Must be called with lock held.
+func (s *Schedule) flat() []Video {
+	var out []Video
+	for _, item := range s.Items {
+		out = append(out, item.Videos...)
+	}
 	return out
 }
 
-// Update replaces the video list atomically.
-func (s *Schedule) Update(videos []Video) {
+// All returns the flat playback order, safe for concurrent use.
+func (s *Schedule) All() []Video {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.flat()
+}
+
+// AllItems returns a shallow copy of the items slice, safe for concurrent use.
+func (s *Schedule) AllItems() []Item {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]Item, len(s.Items))
+	copy(out, s.Items)
+	return out
+}
+
+// Update replaces the item list atomically.
+func (s *Schedule) Update(items []Item) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.Videos = videos
+	s.Items = items
 }
 
 func (s *Schedule) First() *Video {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if len(s.Videos) == 0 {
+	vs := s.flat()
+	if len(vs) == 0 {
 		return nil
 	}
-	return &s.Videos[0]
+	v := vs[0]
+	return &v
 }
 
 func (s *Schedule) Find(videoID string) (*Video, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	for i := range s.Videos {
-		if s.Videos[i].ID == videoID {
-			return &s.Videos[i], true
+	for _, v := range s.flat() {
+		if v.ID == videoID {
+			vCopy := v
+			return &vCopy, true
 		}
 	}
 	return nil, false
@@ -115,9 +141,11 @@ func (s *Schedule) Find(videoID string) (*Video, bool) {
 func (s *Schedule) Next(videoID string) (*Video, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	for i, v := range s.Videos {
+	vs := s.flat()
+	for i, v := range vs {
 		if v.ID == videoID {
-			return &s.Videos[(i+1)%len(s.Videos)], nil
+			next := vs[(i+1)%len(vs)]
+			return &next, nil
 		}
 	}
 	return nil, fmt.Errorf("video %q not found in schedule", videoID)

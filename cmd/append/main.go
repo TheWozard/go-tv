@@ -27,9 +27,10 @@ import (
 
 // ytInfo holds the fields we use from yt-dlp's JSON output.
 type ytInfo struct {
-	ID       string   `json:"id"`
-	Title    string   `json:"title"`
-	Duration *float64 `json:"duration"` // seconds; nil when unavailable
+	ID            string   `json:"id"`
+	Title         string   `json:"title"`
+	Duration      *float64 `json:"duration"`       // seconds; nil when unavailable
+	PlaylistTitle string   `json:"playlist_title"` // non-empty when part of a playlist
 }
 
 func main() {
@@ -53,21 +54,35 @@ func main() {
 		log.Fatal(err)
 	}
 
-	for _, e := range entries {
-		v := schedule.Video{ID: e.ID, Title: e.Title}
-		if e.Duration != nil && *e.Duration > 0 {
-			d := schedule.Duration{Duration: time.Duration(*e.Duration * float64(time.Second)).Truncate(time.Second)}
-			v.Stop = d
-			v.Length = d
-		}
-		sched.Videos = append(sched.Videos, v)
-		fmt.Printf("+ %-20s  %-50s  stop=%s\n", e.ID, e.Title, v.Stop.Duration.Truncate(time.Second))
+	name := entries[0].PlaylistTitle
+	if name == "" {
+		name = entries[0].Title
 	}
+
+	videos := make([]schedule.Video, len(entries))
+	for i, e := range entries {
+		videos[i] = toVideo(e)
+		fmt.Printf("  + %-20s  %s\n", videos[i].ID, videos[i].Title)
+	}
+
+	items := append(sched.AllItems(), schedule.Item{Name: name, Videos: videos})
+	fmt.Printf("added %q (%d video(s))\n", name, len(videos))
+	sched.Update(items)
 
 	if err := sched.Save(*schedPath); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("appended %d video(s) to %s\n", len(entries), *schedPath)
+	fmt.Printf("appended to %s\n", *schedPath)
+}
+
+func toVideo(e ytInfo) schedule.Video {
+	v := schedule.Video{ID: e.ID, Title: e.Title}
+	if e.Duration != nil && *e.Duration > 0 {
+		d := schedule.Duration{Duration: time.Duration(*e.Duration * float64(time.Second)).Truncate(time.Second)}
+		v.Stop = d
+		v.Length = d
+	}
+	return v
 }
 
 // fetch runs yt-dlp and returns one ytInfo per video.
