@@ -35,18 +35,6 @@
     header a { color: #888; text-decoration: none; font-size: .85rem; }
     header a:hover { color: #ccc; }
 
-    #save-btn {
-      background: #2563eb;
-      color: #fff;
-      border: none;
-      padding: 6px 16px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: .85rem;
-    }
-    #save-btn:hover { background: #1d4ed8; }
-    #save-btn:disabled { background: #333; color: #666; cursor: default; }
-
     /* ---- list ---- */
     #video-list {
       list-style: none;
@@ -179,8 +167,7 @@
 <header>
   <h1>go-tv</h1>
   <nav>
-    <a href="/">▶ player</a>
-    <button id="save-btn" disabled>save</button>
+    <a href="/">Resume</a>
   </nav>
 </header>
 
@@ -192,8 +179,7 @@
   let videos = [];  // working copy
   let dirty = false;
 
-  const list    = document.getElementById('video-list');
-  const saveBtn = document.getElementById('save-btn');
+  const list = document.getElementById('video-list');
 
   // -----------------------------------------------------------------------
   // API
@@ -228,20 +214,12 @@
   let saveTimer = null;
   function markDirty() {
     dirty = true;
-    saveBtn.disabled = false;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(async () => {
-      saveBtn.disabled = true;
-      saveBtn.textContent = 'saving…';
       try {
         await saveSchedule(collectOrder());
         dirty = false;
-        saveBtn.textContent = 'saved ✓';
-        setTimeout(() => { saveBtn.textContent = 'save'; }, 1500);
-      } catch {
-        saveBtn.disabled = false;
-        saveBtn.textContent = 'save (error)';
-      }
+      } catch {}
     }, 800);
   }
 
@@ -436,24 +414,6 @@
     }
     videos.forEach(v => list.appendChild(buildCard(v)));
   }
-
-  // -----------------------------------------------------------------------
-  // Save
-  // -----------------------------------------------------------------------
-
-  saveBtn.addEventListener('click', async () => {
-    saveBtn.disabled = true;
-    saveBtn.textContent = 'saving…';
-    try {
-      await saveSchedule(collectOrder());
-      dirty = false;
-      saveBtn.textContent = 'saved ✓';
-      setTimeout(() => { saveBtn.textContent = 'save'; }, 1500);
-    } catch (e) {
-      saveBtn.disabled = false;
-      saveBtn.textContent = 'save (error)';
-    }
-  });
 
   // -----------------------------------------------------------------------
   // Init

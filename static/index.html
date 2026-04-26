@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Go TV</title>
+  <title>go-tv</title>
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
@@ -13,12 +13,31 @@
     html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
     #player-wrapper { position: fixed; inset: 0; }
     #player-wrapper iframe { width: 100%; height: 100%; border: none; }
+    #edit-link {
+      position: fixed;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      background: rgba(0,0,0,.55);
+      color: #aaa;
+      text-decoration: none;
+      font-family: system-ui, sans-serif;
+      font-size: .8rem;
+      padding: 5px 10px;
+      border-radius: 4px;
+      opacity: 0;
+      transition: opacity .2s;
+    }
+    #edit-link:hover { color: #fff; background: rgba(0,0,0,.8); }
+    #edit-link.visible { opacity: 1; }
   </style>
 </head>
 <body>
   <div id="player-wrapper">
     <div id="player"></div>
   </div>
+  <a id="edit-link" href="/edit">Edit</a>
 
   <script>
     /**
@@ -188,6 +207,32 @@
      * Fetches server state, then creates the player pointed at the right video
      * and position. Subsequent state changes are handled by applyState().
      */
+    // Show the edit link on mouse activity, hide after 3 s of idle.
+    // When hidden, a transparent overlay intercepts the next mousemove so we
+    // can detect movement inside the fullscreen iframe (which otherwise eats
+    // all pointer events). The overlay is removed on first mousemove, so
+    // iframe interaction is blocked for at most one frame.
+    const editLink = document.getElementById('edit-link');
+    let hideTimer;
+    let catchOverlay = null;
+
+    function showEdit() {
+      if (catchOverlay) { catchOverlay.remove(); catchOverlay = null; }
+      editLink.classList.add('visible');
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(hideEdit, 3000);
+    }
+
+    function hideEdit() {
+      editLink.classList.remove('visible');
+      catchOverlay = document.createElement('div');
+      catchOverlay.style.cssText = 'position:fixed;inset:0;z-index:9;';
+      catchOverlay.addEventListener('mousemove', showEdit, { once: true });
+      document.body.appendChild(catchOverlay);
+    }
+
+    document.addEventListener('mousemove', showEdit);
+
     window.onYouTubeIframeAPIReady = async function () {
       let state;
       try {
