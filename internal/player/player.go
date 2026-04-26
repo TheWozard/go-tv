@@ -64,15 +64,15 @@ func Run(ctx context.Context, p Player, sched *schedule.Schedule, st *state.Stat
 		cancel()
 	}
 
-	startPlaying := func() {
+	startPlaying := func() bool {
 		videoID, seconds := st.Get()
 		if videoID == activeVideo {
-			return
+			return true
 		}
 		cancel()
 		video, ok := sched.Find(videoID)
 		if !ok {
-			return
+			return true
 		}
 		playCtx, playCancel2 := context.WithCancel(ctx)
 		playCancel = playCancel2
@@ -81,16 +81,19 @@ func Run(ctx context.Context, p Player, sched *schedule.Schedule, st *state.Stat
 			log.Printf("player: play %s: %v", videoID, err)
 			playCancel()
 			playCancel = nil
-			return
+			return false
 		}
 		events = ch
 		activeVideo = videoID
+		return true
 	}
 
 	ticker := time.NewTicker(stateCheckInterval)
 	defer ticker.Stop()
 
-	startPlaying()
+	if !startPlaying() {
+		return
+	}
 
 	for {
 		select {

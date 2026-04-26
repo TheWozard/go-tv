@@ -6,6 +6,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"go-tv/internal/schedule"
 )
 
 type persisted struct {
@@ -23,7 +25,8 @@ func New(videoID string) *State {
 	return &State{VideoID: videoID}
 }
 
-func Load(path string, def *State) *State {
+func Load(path string, sched *schedule.Schedule) *State {
+	def := &State{VideoID: sched.First().ID}
 	f, err := os.Open(path)
 	if err != nil {
 		return def
@@ -35,6 +38,9 @@ func Load(path string, def *State) *State {
 	}
 	d, err := time.ParseDuration(p.Position)
 	if err != nil {
+		return def
+	}
+	if _, ok := sched.Find(p.VideoID); !ok {
 		return def
 	}
 	return &State{

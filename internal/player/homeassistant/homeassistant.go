@@ -8,6 +8,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -20,9 +22,10 @@ const defaultPollInterval = 5 * time.Second
 
 // Config holds the credentials and target entity for a Home Assistant instance.
 type Config struct {
-	URL      string // e.g. "http://homeassistant.local:8123"
-	Token    string // long-lived access token
-	EntityID string // e.g. "media_player.living_room_tv"
+	URL       string // e.g. "http://homeassistant.local:8123"
+	Token     string // long-lived access token
+	EntityID  string // e.g. "media_player.living_room_tv"
+	MediaType string // passed to play_media as media_content_type; defaults to "url"
 }
 
 // Player implements player.Player using the Home Assistant REST API.
@@ -46,6 +49,9 @@ func New(cfg Config) *Player {
 // entity reports a terminal state (idle/off/unavailable), at which point the
 // channel is closed.
 func (p *Player) Play(ctx context.Context, video schedule.Video, seconds float64) (<-chan player.Event, error) {
+	if _, err := p.getEntityState(ctx); err != nil {
+		return nil, fmt.Errorf("entity %s not reachable: %w", p.cfg.EntityID, err)
+	}
 	if err := p.sendPlay(ctx, video, seconds); err != nil {
 		return nil, err
 	}
@@ -56,14 +62,23 @@ func (p *Player) Play(ctx context.Context, video schedule.Video, seconds float64
 
 // sendPlay calls the media_player.play_media HA service.
 func (p *Player) sendPlay(ctx context.Context, video schedule.Video, seconds float64) error {
-	url := fmt.Sprintf("https://www.youtube.com/watch?v=%s&t=%d", video.ID, int(seconds))
-	body := fmt.Sprintf(
-		`{"entity_id":%q,"media_content_id":%q,"media_content_type":"url"}`,
-		p.cfg.EntityID, url,
-	)
+	mediaType := p.cfg.MediaType
+	if mediaType == "" {
+		mediaType = "video"
+	}
+	contentID := fmt.Sprintf("youtube://www.youtube.com/watch?v=%s&t=%d", video.ID, int(seconds))
+	body, err := json.Marshal(map[string]any{
+		"entity_id":          p.cfg.EntityID,
+		"media_content_id":   contentID,
+		"media_content_type": mediaType,
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf("ha: play_media %s", body)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		p.cfg.URL+"/api/services/media_player/play_media",
-		strings.NewReader(body))
+		strings.NewReader(string(body)))
 	if err != nil {
 		return err
 	}
@@ -72,9 +87,10 @@ func (p *Player) sendPlay(ctx context.Context, video schedule.Video, seconds flo
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		return fmt.Errorf("HA returned %s", resp.Status)
+		detail, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("HA returned %s: %s", resp.Status, strings.TrimSpace(string(detail)))
 	}
 	return nil
 }
@@ -100,6 +116,10 @@ func (p *Player) getEntityState(ctx context.Context) (*haState, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		detail, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("HA returned %s: %s", resp.Status, strings.TrimSpace(string(detail)))
+	}
 	var s haState
 	if err := json.NewDecoder(resp.Body).Decode(&s); err != nil {
 		return nil, err

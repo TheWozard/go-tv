@@ -15,25 +15,34 @@
       position: fixed;
       inset: 0;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 12px;
+      font-family: system-ui, sans-serif;
     }
-    #play-btn {
+    .start-btn {
       background: none;
-      border: 2px solid #444;
+      border: 1px solid #444;
       color: #888;
-      font-size: 2.5rem;
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
+      font-size: .9rem;
+      padding: 10px 24px;
+      border-radius: 6px;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding-left: 6px;
       transition: border-color .2s, color .2s;
+      min-width: 160px;
     }
-    #play-btn:hover { border-color: #aaa; color: #ddd; }
+    .start-btn:hover { border-color: #aaa; color: #ddd; }
+    .start-btn.primary {
+      border: 2px solid #444;
+      font-size: 1rem;
+      padding: 12px 28px;
+    }
+    .start-divider {
+      color: #333;
+      font-size: .75rem;
+      margin: 4px 0;
+    }
     #player-wrapper { position: fixed; inset: 0; display: none; }
     #player-wrapper iframe { width: 100%; height: 100%; border: none; }
     #edit-link {
@@ -57,9 +66,7 @@
   </style>
 </head>
 <body>
-  <div id="start-screen">
-    <button id="play-btn">&#9654;</button>
-  </div>
+  <div id="start-screen"></div>
   <div id="player-wrapper">
     <div id="player"></div>
   </div>
@@ -262,7 +269,7 @@
       resolveYtReady();
     };
 
-    document.getElementById('play-btn').addEventListener('click', async () => {
+    async function startHere() {
       document.getElementById('start-screen').style.display = 'none';
       document.getElementById('player-wrapper').style.display = 'block';
 
@@ -286,12 +293,46 @@
           onStateChange(event) {
             if (event.data === YT.PlayerState.ENDED) advance();
           },
-          onError() {
-            advance();
-          },
+          onError() { advance(); },
         },
       });
-    });
+    }
+
+    async function startIntegration(name) {
+      await fetch(`/api/integrations/${encodeURIComponent(name)}`, { method: 'POST' });
+    }
+
+    async function renderStartScreen() {
+      const screen = document.getElementById('start-screen');
+      let integrations = [];
+      try {
+        const res = await fetch('/api/integrations');
+        if (res.ok) ({ integrations } = await res.json());
+      } catch {}
+
+      const watchBtn = document.createElement('button');
+      watchBtn.className = 'start-btn primary';
+      watchBtn.textContent = '▶ Watch Here';
+      watchBtn.addEventListener('click', startHere);
+      screen.appendChild(watchBtn);
+
+      if (integrations.length > 0) {
+        const divider = document.createElement('div');
+        divider.className = 'start-divider';
+        divider.textContent = 'or play on';
+        screen.appendChild(divider);
+
+        for (const { name } of integrations) {
+          const btn = document.createElement('button');
+          btn.className = 'start-btn';
+          btn.textContent = name;
+          btn.addEventListener('click', () => startIntegration(name));
+          screen.appendChild(btn);
+        }
+      }
+    }
+
+    renderStartScreen();
   </script>
   <script src="https://www.youtube.com/iframe_api" async></script>
 </body>

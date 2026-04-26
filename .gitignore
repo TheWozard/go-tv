@@ -5,6 +5,7 @@
 go-tv
 
 # runtime data — not source-controlled
+config.yaml
 state.json
 schedule.json
 

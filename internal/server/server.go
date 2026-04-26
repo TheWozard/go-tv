@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"go-tv/internal/integration"
 	"go-tv/internal/schedule"
 	"go-tv/internal/state"
 )
@@ -51,17 +52,26 @@ type scheduleItem struct {
 }
 
 // -------------------------------------------------------------------------
-// Mount
+// Server
 // -------------------------------------------------------------------------
 
-func Mount(r chi.Router, sched *schedule.Schedule, schedPath string, st *state.State) {
-	r.Get("/edit", editHandler())
-	r.Get("/api/state", stateHandler(sched, st))
-	r.Get("/api/schedule", scheduleGetHandler(sched))
-	r.Post("/api/schedule", schedulePostHandler(sched, schedPath))
-	r.Post("/api/progress", progressHandler(st))
-	r.Post("/api/next", nextHandler(sched, st))
-	r.Post("/api/jump", jumpHandler(sched, st))
+type Server struct {
+	Schedule     *schedule.Schedule
+	SchedulePath string
+	State        *state.State
+	Manager      *integration.Manager
+}
+
+func (s *Server) Route(r chi.Router) {
+	r.Get("/edit", s.editHandler)
+	r.Get("/api/state", s.stateHandler)
+	r.Get("/api/schedule", s.scheduleGetHandler)
+	r.Post("/api/schedule", s.schedulePostHandler)
+	r.Post("/api/progress", s.progressHandler)
+	r.Post("/api/next", s.nextHandler)
+	r.Post("/api/jump", s.jumpHandler)
+	r.Get("/api/integrations", s.integrationsHandler)
+	r.Post("/api/integrations/{name}", s.activateIntegrationHandler)
 	r.Handle("/*", http.FileServer(http.Dir("static")))
 }
 
@@ -75,9 +85,9 @@ func writeJSON(w http.ResponseWriter, v any, code int) {
 	json.NewEncoder(w).Encode(v)
 }
 
-func currentState(sched *schedule.Schedule, st *state.State) (stateResponse, bool) {
-	videoID, seconds := st.Get()
-	video, ok := sched.Find(videoID)
+func (s *Server) currentState() (stateResponse, bool) {
+	videoID, seconds := s.State.Get()
+	video, ok := s.Schedule.Find(videoID)
 	if !ok {
 		return stateResponse{}, false
 	}
@@ -136,107 +146,116 @@ func wireToItem(w scheduleItem) schedule.Item {
 // Handlers
 // -------------------------------------------------------------------------
 
-func editHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "static/edit.html")
+func (s *Server) integrationsHandler(w http.ResponseWriter, r *http.Request) {
+	type entry struct {
+		Name   string `json:"name"`
+		Active bool   `json:"active"`
 	}
+	active := s.Manager.Active()
+	names := s.Manager.Names()
+	entries := make([]entry, len(names))
+	for i, n := range names {
+		entries[i] = entry{Name: n, Active: n == active}
+	}
+	writeJSON(w, map[string]any{"integrations": entries}, http.StatusOK)
 }
 
-func stateHandler(sched *schedule.Schedule, st *state.State) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		resp, ok := currentState(sched, st)
-		if !ok {
-			http.Error(w, "current video not in schedule", http.StatusInternalServerError)
-			return
-		}
-		writeJSON(w, resp, http.StatusOK)
+func (s *Server) activateIntegrationHandler(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	if err := s.Manager.Activate(name); err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
 	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
-func scheduleGetHandler(sched *schedule.Schedule) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		its := sched.AllItems()
-		entries := make([]scheduleItem, len(its))
-		for i, it := range its {
-			entries[i] = itemToWire(it)
-		}
-		writeJSON(w, map[string]any{"items": entries}, http.StatusOK)
-	}
+func (s *Server) editHandler(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "static/edit.html")
 }
 
-func schedulePostHandler(sched *schedule.Schedule, schedPath string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var body struct {
-			Items []scheduleItem `json:"items"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			http.Error(w, "invalid body", http.StatusBadRequest)
-			return
-		}
-		items := make([]schedule.Item, len(body.Items))
-		for i, entry := range body.Items {
-			items[i] = wireToItem(entry)
-		}
-		sched.Update(items)
-		if err := sched.Save(schedPath); err != nil {
-			http.Error(w, "failed to save schedule", http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusNoContent)
+func (s *Server) stateHandler(w http.ResponseWriter, r *http.Request) {
+	resp, ok := s.currentState()
+	if !ok {
+		http.Error(w, "current video not in schedule", http.StatusInternalServerError)
+		return
 	}
+	writeJSON(w, resp, http.StatusOK)
 }
 
-func jumpHandler(sched *schedule.Schedule, st *state.State) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var req jumpRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.VideoID == "" {
-			http.Error(w, "invalid body", http.StatusBadRequest)
-			return
-		}
-		if _, ok := sched.Find(req.VideoID); !ok {
-			http.Error(w, "video not in schedule", http.StatusBadRequest)
-			return
-		}
-		st.Jump(req.VideoID, req.Seconds)
-		resp, ok := currentState(sched, st)
-		if !ok {
-			http.Error(w, "current video not in schedule", http.StatusInternalServerError)
-			return
-		}
-		writeJSON(w, resp, http.StatusOK)
+func (s *Server) scheduleGetHandler(w http.ResponseWriter, r *http.Request) {
+	its := s.Schedule.AllItems()
+	entries := make([]scheduleItem, len(its))
+	for i, it := range its {
+		entries[i] = itemToWire(it)
 	}
+	writeJSON(w, map[string]any{"items": entries}, http.StatusOK)
 }
 
-func progressHandler(st *state.State) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var req progressRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.VideoID == "" {
-			http.Error(w, "invalid body", http.StatusBadRequest)
-			return
-		}
-		st.SetPosition(req.VideoID, req.Seconds)
-		w.WriteHeader(http.StatusNoContent)
+func (s *Server) schedulePostHandler(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Items []scheduleItem `json:"items"`
 	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	items := make([]schedule.Item, len(body.Items))
+	for i, entry := range body.Items {
+		items[i] = wireToItem(entry)
+	}
+	s.Schedule.Update(items)
+	if err := s.Schedule.Save(s.SchedulePath); err != nil {
+		http.Error(w, "failed to save schedule", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
-func nextHandler(sched *schedule.Schedule, st *state.State) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var req nextRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.VideoID == "" {
-			http.Error(w, "invalid body", http.StatusBadRequest)
-			return
-		}
-		next, err := sched.Next(req.VideoID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		st.Advance(req.VideoID, next.ID, next.StartSeconds())
-		resp, ok := currentState(sched, st)
-		if !ok {
-			http.Error(w, "current video not in schedule", http.StatusInternalServerError)
-			return
-		}
-		writeJSON(w, resp, http.StatusOK)
+func (s *Server) jumpHandler(w http.ResponseWriter, r *http.Request) {
+	var req jumpRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.VideoID == "" {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
 	}
+	if _, ok := s.Schedule.Find(req.VideoID); !ok {
+		http.Error(w, "video not in schedule", http.StatusBadRequest)
+		return
+	}
+	s.State.Jump(req.VideoID, req.Seconds)
+	resp, ok := s.currentState()
+	if !ok {
+		http.Error(w, "current video not in schedule", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, resp, http.StatusOK)
+}
+
+func (s *Server) progressHandler(w http.ResponseWriter, r *http.Request) {
+	var req progressRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.VideoID == "" {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	s.State.SetPosition(req.VideoID, req.Seconds)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) nextHandler(w http.ResponseWriter, r *http.Request) {
+	var req nextRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.VideoID == "" {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	next, err := s.Schedule.Next(req.VideoID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	s.State.Advance(req.VideoID, next.ID, next.StartSeconds())
+	resp, ok := s.currentState()
+	if !ok {
+		http.Error(w, "current video not in schedule", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, resp, http.StatusOK)
 }
