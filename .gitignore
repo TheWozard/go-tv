@@ -1,0 +1,5 @@
+# binary
+go-tv
+
+# runtime state — restored on shutdown, not source-controlled
+state.json

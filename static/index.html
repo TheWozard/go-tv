@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+    #player-wrapper { position: fixed; inset: 0; }
+    #player-wrapper iframe { width: 100%; height: 100%; border: none; }
+  </style>
+</head>
+<body>
+  <div id="player-wrapper">
+    <div id="player"></div>
+  </div>
+  <script>
+    let player;
+    let currentVideoId;
+
+    async function fetchState() {
+      const res = await fetch('/api/state');
+      if (!res.ok) throw new Error('failed to fetch state');
+      return res.json();
+    }
+
+    async function postNext(videoId) {
+      const res = await fetch('/api/next', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ video_id: videoId }),
+      });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error('failed to advance');
+      return res.json();
+    }
+
+    function applyState(state) {
+      const seekTo = Math.max(0, (Date.now() - state.started_at) / 1000);
+      if (currentVideoId === state.video_id) {
+        if (player && Math.abs(player.getCurrentTime() - seekTo) > 5) {
+          player.seekTo(seekTo, true);
+        }
+        return;
+      }
+      currentVideoId = state.video_id;
+      if (player) {
+        player.loadVideoById({ videoId: state.video_id, startSeconds: Math.floor(seekTo) });
+      }
+    }
+
+    window.onYouTubeIframeAPIReady = async function () {
+      let state;
+      try {
+        state = await fetchState();
+      } catch (e) {
+        return;
+      }
+
+      const seekTo = Math.max(0, Math.floor((Date.now() - state.started_at) / 1000));
+      currentVideoId = state.video_id;
+
+      player = new YT.Player('player', {
+        videoId: state.video_id,
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          disablekb: 1,
+          start: seekTo,
+          rel: 0,
+          modestbranding: 1,
+        },
+        events: {
+          async onStateChange(event) {
+            if (event.data === YT.PlayerState.ENDED) {
+              try {
+                const next = await postNext(currentVideoId);
+                if (next) {
+                  applyState(next);
+                }
+              } catch (e) {
+                // end of schedule or network error — stay on current video
+              }
+            }
+          },
+        },
+      });
+    };
+  </script>
+  <script src="https://www.youtube.com/iframe_api" async></script>
+</body>
+</html>
