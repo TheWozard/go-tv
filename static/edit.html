@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>go-tv / edit</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #111;
+      color: #ddd;
+      font-family: system-ui, sans-serif;
+      font-size: 14px;
+    }
+
+    /* ---- header ---- */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background: #1a1a1a;
+      border-bottom: 1px solid #2a2a2a;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header h1 { font-size: 1rem; color: #666; letter-spacing: .08em; }
+    header nav { display: flex; gap: 12px; align-items: center; }
+    header a { color: #888; text-decoration: none; font-size: .85rem; }
+    header a:hover { color: #ccc; }
+
+    #save-btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 6px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: .85rem;
+    }
+    #save-btn:hover { background: #1d4ed8; }
+    #save-btn:disabled { background: #333; color: #666; cursor: default; }
+
+    /* ---- list ---- */
+    #video-list {
+      list-style: none;
+      max-width: 860px;
+      margin: 24px auto;
+      padding: 0 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* ---- card ---- */
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 6px;
+      padding: 14px 16px;
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 0 12px;
+      align-items: start;
+      cursor: default;
+      transition: border-color .15s;
+    }
+    .card.drag-over { border-color: #2563eb; }
+    .card.dragging { opacity: .4; }
+
+    /* drag handle */
+    .handle {
+      cursor: grab;
+      color: #444;
+      font-size: 18px;
+      line-height: 1;
+      padding-top: 2px;
+      user-select: none;
+    }
+    .handle:active { cursor: grabbing; }
+
+    /* card body */
+    .body {}
+    .meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 12px;
+    }
+    .title { font-weight: 500; color: #eee; }
+    .vid-id { font-size: .75rem; color: #555; font-family: monospace; }
+
+    /* ---- dual-thumb slider ---- */
+    .slider-wrap {
+      position: relative;
+      height: 4px;
+      background: #2a2a2a;
+      border-radius: 2px;
+      margin: 18px 0 10px;
+    }
+    .slider-range {
+      position: absolute;
+      height: 100%;
+      background: #2563eb;
+      border-radius: 2px;
+      pointer-events: none;
+    }
+    .slider-wrap input[type=range] {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      outline: none;
+      border: none;
+      margin: 0;
+      padding: 0;
+      pointer-events: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .slider-wrap input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      pointer-events: auto;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #fff;
+      cursor: grab;
+      box-shadow: 0 1px 3px rgba(0,0,0,.5);
+    }
+    .slider-wrap input[type=range]::-moz-range-thumb {
+      pointer-events: auto;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #fff;
+      cursor: grab;
+      border: none;
+      box-shadow: 0 1px 3px rgba(0,0,0,.5);
+    }
+    .slider-wrap input[type=range]:active::-webkit-slider-thumb { cursor: grabbing; }
+
+    .times {
+      display: flex;
+      justify-content: space-between;
+      font-size: .75rem;
+      color: #777;
+    }
+    .time-input {
+      background: none;
+      border: none;
+      border-bottom: 1px solid #444;
+      color: #aaa;
+      font-size: .75rem;
+      font-family: inherit;
+      width: 40px;
+      text-align: center;
+      padding: 0 2px;
+      outline: none;
+    }
+    .time-input:focus { border-bottom-color: #2563eb; color: #eee; }
+    .yt-link { font-size: .75rem; color: #555; text-decoration: none; }
+    .yt-link:hover { color: #c44; }
+
+    /* ---- empty / loading ---- */
+    #status { text-align: center; color: #555; padding: 60px 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>go-tv</h1>
+  <nav>
+    <a href="/">▶ player</a>
+    <button id="save-btn" disabled>save</button>
+  </nav>
+</header>
+
+<ul id="video-list">
+  <li id="status">Loading…</li>
+</ul>
+
+<script>
+  let videos = [];  // working copy
+  let dirty = false;
+
+  const list    = document.getElementById('video-list');
+  const saveBtn = document.getElementById('save-btn');
+
+  // -----------------------------------------------------------------------
+  // API
+  // -----------------------------------------------------------------------
+
+  async function loadSchedule() {
+    const res = await fetch('/api/schedule');
+    if (!res.ok) throw new Error('failed to load schedule');
+    const data = await res.json();
+    return data.videos ?? [];
+  }
+
+  async function saveSchedule(videos) {
+    const res = await fetch('/api/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ videos }),
+    });
+    if (!res.ok) throw new Error('failed to save');
+  }
+
+  // -----------------------------------------------------------------------
+  // Helpers
+  // -----------------------------------------------------------------------
+
+  function fmt(secs) {
+    const s = Math.round(secs);
+    const m = Math.floor(s / 60);
+    return `${m}:${String(s % 60).padStart(2, '0')}`;
+  }
+
+  let saveTimer = null;
+  function markDirty() {
+    dirty = true;
+    saveBtn.disabled = false;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'saving…';
+      try {
+        await saveSchedule(collectOrder());
+        dirty = false;
+        saveBtn.textContent = 'saved ✓';
+        setTimeout(() => { saveBtn.textContent = 'save'; }, 1500);
+      } catch {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'save (error)';
+      }
+    }, 800);
+  }
+
+  // -----------------------------------------------------------------------
+  // Slider
+  // -----------------------------------------------------------------------
+
+  function updateSlider(card) {
+    const start  = card.querySelector('.start-range');
+    const stop   = card.querySelector('.stop-range');
+    const range  = card.querySelector('.slider-range');
+    const max    = parseFloat(start.max) || 1;
+    const startV = parseFloat(start.value);
+    const stopV  = parseFloat(stop.value);
+
+    const leftPct  = (startV / max) * 100;
+    const rightPct = (stopV  / max) * 100;
+    range.style.left  = leftPct + '%';
+    range.style.width = (rightPct - leftPct) + '%';
+
+    card.querySelector('.start-time').value = fmt(startV);
+    card.querySelector('.stop-time').value  = fmt(stopV);
+    card.querySelector('.stop-early').textContent = `-${Math.round(max - stopV)}s`;
+  }
+
+  function onStartInput(e) {
+    const card = e.target.closest('.card');
+    const stop = card.querySelector('.stop-range');
+    if (parseFloat(e.target.value) >= parseFloat(stop.value)) {
+      e.target.value = Math.max(0, parseFloat(stop.value) - 1);
+    }
+    updateSlider(card);
+    syncVideoFromCard(card);
+    markDirty();
+  }
+
+  function onStopInput(e) {
+    const card = e.target.closest('.card');
+    const start = card.querySelector('.start-range');
+    if (parseFloat(e.target.value) <= parseFloat(start.value)) {
+      e.target.value = Math.min(parseFloat(e.target.max), parseFloat(start.value) + 1);
+    }
+    updateSlider(card);
+    syncVideoFromCard(card);
+    markDirty();
+  }
+
+  function parseFmt(str) {
+    const parts = String(str).trim().split(':');
+    if (parts.length === 2) return parseFloat(parts[0]) * 60 + parseFloat(parts[1]);
+    return parseFloat(str) || 0;
+  }
+
+  function onStartTimeChange(e) {
+    const card = e.target.closest('.card');
+    const startRange = card.querySelector('.start-range');
+    const stopRange  = card.querySelector('.stop-range');
+    let v = parseFmt(e.target.value);
+    v = Math.max(0, Math.min(v, parseFloat(stopRange.value) - 1));
+    startRange.value = v;
+    updateSlider(card);
+    syncVideoFromCard(card);
+    markDirty();
+  }
+
+  function onStopTimeChange(e) {
+    const card = e.target.closest('.card');
+    const startRange = card.querySelector('.start-range');
+    const stopRange  = card.querySelector('.stop-range');
+    let v = parseFmt(e.target.value);
+    v = Math.min(parseFloat(stopRange.max), Math.max(v, parseFloat(startRange.value) + 1));
+    stopRange.value = v;
+    updateSlider(card);
+    syncVideoFromCard(card);
+    markDirty();
+  }
+
+  // -----------------------------------------------------------------------
+  // Build card DOM
+  // -----------------------------------------------------------------------
+
+  function buildCard(v) {
+    const li = document.createElement('li');
+    li.className = 'card';
+    li.dataset.id = v.id;
+
+    const max    = v.length_seconds || v.stop_seconds || 600;
+    const startV = v.start_seconds  || 0;
+    const stopV  = v.stop_seconds   || max;
+
+    li.innerHTML = `
+      <div class="handle" title="drag to reorder">⠿</div>
+      <div class="body">
+        <div class="meta">
+          <span class="title">${escHtml(v.title || v.id)}</span>
+          <a class="vid-id yt-link" href="https://www.youtube.com/watch?v=${escHtml(v.id)}" target="_blank" rel="noopener">${escHtml(v.id)}</a>
+        </div>
+        <div class="slider-wrap">
+          <div class="slider-range"></div>
+          <input class="start-range" type="range" min="0" max="${max}" step="1" value="${startV}">
+          <input class="stop-range"  type="range" min="0" max="${max}" step="1" value="${stopV}">
+        </div>
+        <div class="times">
+          <span>Start <input class="start-time time-input" type="text"></span>
+          <span style="color:#444">${fmt(max)}</span>
+          <span>Stop <input class="stop-time time-input" type="text"> <span class="stop-early"></span></span>
+        </div>
+      </div>`;
+
+    li.querySelector('.start-range').addEventListener('input', onStartInput);
+    li.querySelector('.stop-range').addEventListener('input', onStopInput);
+    li.querySelector('.start-time').addEventListener('change', onStartTimeChange);
+    li.querySelector('.stop-time').addEventListener('change', onStopTimeChange);
+
+    // Prevent slider/input interactions from triggering drag
+    li.querySelectorAll('input').forEach(input => {
+      input.addEventListener('mousedown', e => e.stopPropagation());
+    });
+
+    initDrag(li);
+    updateSlider(li);
+    return li;
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // -----------------------------------------------------------------------
+  // Sync card → videos array
+  // -----------------------------------------------------------------------
+
+  function syncVideoFromCard(card) {
+    const id = card.dataset.id;
+    const v  = videos.find(v => v.id === id);
+    if (!v) return;
+    v.start_seconds = parseFloat(card.querySelector('.start-range').value);
+    v.stop_seconds  = parseFloat(card.querySelector('.stop-range').value);
+  }
+
+  function collectOrder() {
+    return [...list.querySelectorAll('.card')].map(card => {
+      const id = card.dataset.id;
+      return videos.find(v => v.id === id);
+    }).filter(Boolean);
+  }
+
+  // -----------------------------------------------------------------------
+  // Drag & drop reordering
+  // -----------------------------------------------------------------------
+
+  let dragSrc = null;
+
+  function initDrag(card) {
+    const handle = card.querySelector('.handle');
+
+    handle.addEventListener('mousedown', () => { card.draggable = true; });
+    card.addEventListener('dragend', () => {
+      card.draggable = false;
+      card.classList.remove('dragging', 'drag-over');
+      list.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
+      dragSrc = null;
+    });
+    card.addEventListener('dragstart', e => {
+      dragSrc = card;
+      e.dataTransfer.effectAllowed = 'move';
+      card.classList.add('dragging');
+    });
+    card.addEventListener('dragover', e => {
+      e.preventDefault();
+      if (!dragSrc || dragSrc === card) return;
+      list.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
+      card.classList.add('drag-over');
+      const items = [...list.querySelectorAll('.card')];
+      const srcIdx = items.indexOf(dragSrc);
+      const dstIdx = items.indexOf(card);
+      list.insertBefore(dragSrc, srcIdx < dstIdx ? card.nextSibling : card);
+      markDirty();
+    });
+  }
+
+  // -----------------------------------------------------------------------
+  // Render
+  // -----------------------------------------------------------------------
+
+  function render(data) {
+    videos = data;
+    list.innerHTML = '';
+    if (!videos.length) {
+      list.innerHTML = '<li id="status">No videos in schedule.</li>';
+      return;
+    }
+    videos.forEach(v => list.appendChild(buildCard(v)));
+  }
+
+  // -----------------------------------------------------------------------
+  // Save
+  // -----------------------------------------------------------------------
+
+  saveBtn.addEventListener('click', async () => {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'saving…';
+    try {
+      await saveSchedule(collectOrder());
+      dirty = false;
+      saveBtn.textContent = 'saved ✓';
+      setTimeout(() => { saveBtn.textContent = 'save'; }, 1500);
+    } catch (e) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'save (error)';
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // Init
+  // -----------------------------------------------------------------------
+
+  loadSchedule()
+    .then(render)
+    .catch(() => { list.innerHTML = '<li id="status">Failed to load schedule.</li>'; });
+</script>
+</body>
+</html>
