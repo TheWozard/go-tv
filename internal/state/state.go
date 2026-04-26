@@ -73,6 +73,13 @@ func (s *State) SetPosition(videoID string, seconds float64) {
 	s.Seconds = seconds
 }
 
+func (s *State) Jump(videoID string, seconds float64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.VideoID = videoID
+	s.Seconds = seconds
+}
+
 func (s *State) Advance(currentVideoID, nextVideoID string, startSeconds float64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

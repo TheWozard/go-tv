@@ -61,6 +61,7 @@
     }
     .card.drag-over { border-color: #2563eb; }
     .card.dragging { opacity: .4; }
+    .card.active { border-color: #22c55e; }
 
     /* drag handle */
     .handle {
@@ -74,7 +75,6 @@
     .handle:active { cursor: grabbing; }
 
     /* card body */
-    .body {}
     .meta {
       display: flex;
       justify-content: space-between;
@@ -82,24 +82,31 @@
       margin-bottom: 12px;
     }
     .title { font-weight: 500; color: #eee; }
-    .vid-id { font-size: .75rem; color: #555; font-family: monospace; }
+    .vid-id { font-size: .75rem; font-family: monospace; }
 
-    /* ---- dual-thumb slider ---- */
-    .slider-wrap {
+    /* ---- sliders (shared) ---- */
+    .slider-wrap,
+    .pos-slider-wrap {
       position: relative;
       height: 4px;
       background: #2a2a2a;
       border-radius: 2px;
-      margin: 18px 0 10px;
     }
-    .slider-range {
+    .slider-wrap     { margin: 18px 0 10px; }
+    .pos-slider-wrap { margin: 8px 0; }
+
+    .slider-range,
+    .pos-fill {
       position: absolute;
       height: 100%;
-      background: #2563eb;
       border-radius: 2px;
       pointer-events: none;
     }
-    .slider-wrap input[type=range] {
+    .slider-range { background: #2563eb; }
+    .pos-fill     { background: #22c55e; }
+
+    .slider-wrap input[type=range],
+    .pos-slider-wrap input[type=range] {
       position: absolute;
       width: 100%;
       height: 100%;
@@ -110,37 +117,42 @@
       border: none;
       margin: 0;
       padding: 0;
-      pointer-events: none;
       -webkit-appearance: none;
       appearance: none;
     }
-    .slider-wrap input[type=range]::-webkit-slider-thumb {
+    .slider-wrap input[type=range] { pointer-events: none; }
+
+    .slider-wrap input[type=range]::-webkit-slider-thumb,
+    .pos-slider-wrap input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none;
-      pointer-events: auto;
       width: 14px;
       height: 14px;
       border-radius: 50%;
-      background: #fff;
       cursor: grab;
       box-shadow: 0 1px 3px rgba(0,0,0,.5);
     }
-    .slider-wrap input[type=range]::-moz-range-thumb {
-      pointer-events: auto;
+    .slider-wrap input[type=range]::-webkit-slider-thumb     { pointer-events: auto; background: #fff; }
+    .pos-slider-wrap input[type=range]::-webkit-slider-thumb { background: #22c55e; }
+
+    .slider-wrap input[type=range]::-moz-range-thumb,
+    .pos-slider-wrap input[type=range]::-moz-range-thumb {
       width: 14px;
       height: 14px;
       border-radius: 50%;
-      background: #fff;
       cursor: grab;
       border: none;
       box-shadow: 0 1px 3px rgba(0,0,0,.5);
     }
-    .slider-wrap input[type=range]:active::-webkit-slider-thumb { cursor: grabbing; }
+    .slider-wrap input[type=range]::-moz-range-thumb     { pointer-events: auto; background: #fff; }
+    .pos-slider-wrap input[type=range]::-moz-range-thumb { background: #22c55e; }
+
+    .slider-wrap input[type=range]:active::-webkit-slider-thumb,
+    .pos-slider-wrap input[type=range]:active::-webkit-slider-thumb { cursor: grabbing; }
 
     .times {
       display: flex;
       justify-content: space-between;
       font-size: .75rem;
-      color: #777;
     }
     .time-input {
       background: none;
@@ -155,11 +167,35 @@
       outline: none;
     }
     .time-input:focus { border-bottom-color: #2563eb; color: #eee; }
-    .yt-link { font-size: .75rem; color: #555; text-decoration: none; }
+    .yt-link { font-size: .75rem; text-decoration: none; }
     .yt-link:hover { color: #c44; }
 
+    .text-faint { color: #444; }
+    .text-muted { color: #555; }
+    .text-dim   { color: #777; }
+
+    .meta-right { display: flex; gap: 8px; align-items: center; }
+    .play-btn {
+      background: none;
+      border: none;
+      color: #444;
+      cursor: pointer;
+      font-size: .8rem;
+      padding: 0 2px;
+      line-height: 1;
+      transition: color .15s;
+    }
+    .play-btn:hover { color: #ccc; }
+    .card.active .play-btn { color: #22c55e; }
+
+    /* ---- position slider ---- */
+    .pos-wrap {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #222;
+    }
     /* ---- empty / loading ---- */
-    #status { text-align: center; color: #555; padding: 60px 0; }
+    #status { text-align: center; padding: 60px 0; }
   </style>
 </head>
 <body>
@@ -172,7 +208,7 @@
 </header>
 
 <ul id="video-list">
-  <li id="status">Loading…</li>
+  <li id="status" class="text-muted">Loading…</li>
 </ul>
 
 <script>
@@ -190,6 +226,24 @@
     if (!res.ok) throw new Error('failed to load schedule');
     const data = await res.json();
     return data.videos ?? [];
+  }
+
+  async function loadState() {
+    try {
+      const res = await fetch('/api/state');
+      if (!res.ok) return null;
+      return res.json();
+    } catch { return null; }
+  }
+
+  async function jump(videoId, seconds) {
+    const res = await fetch('/api/jump', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ video_id: videoId, seconds }),
+    });
+    if (!res.ok) throw new Error('failed to jump');
+    return res.json();
   }
 
   async function saveSchedule(videos) {
@@ -221,6 +275,48 @@
         dirty = false;
       } catch {}
     }, 800);
+  }
+
+  // -----------------------------------------------------------------------
+  // Active state
+  // -----------------------------------------------------------------------
+
+  let activeVideoId = null;
+
+  function updatePosSlider(card) {
+    const range = card.querySelector('.pos-range');
+    const fill  = card.querySelector('.pos-fill');
+    const val   = parseFloat(range.value);
+    fill.style.width = (val / (parseFloat(range.max) || 1) * 100) + '%';
+    card.querySelector('.pos-display').textContent = fmt(val);
+  }
+
+  function onPosInput(e) {
+    updatePosSlider(e.target.closest('.card'));
+  }
+
+  async function onPosChange(e) {
+    const card = e.target.closest('.card');
+    try {
+      await jump(card.dataset.id, parseFloat(card.querySelector('.pos-range').value));
+    } catch {}
+  }
+
+  function setActive(videoId, seconds) {
+    if (activeVideoId) {
+      const prev = list.querySelector(`.card[data-id="${CSS.escape(activeVideoId)}"]`);
+      if (prev) {
+        prev.querySelector('.pos-wrap').style.display = 'none';
+        prev.classList.remove('active');
+      }
+    }
+    activeVideoId = videoId;
+    const card = list.querySelector(`.card[data-id="${CSS.escape(videoId)}"]`);
+    if (!card) return;
+    card.querySelector('.pos-range').value = seconds;
+    updatePosSlider(card);
+    card.querySelector('.pos-wrap').style.display = '';
+    card.classList.add('active');
   }
 
   // -----------------------------------------------------------------------
@@ -315,17 +411,30 @@
       <div class="body">
         <div class="meta">
           <span class="title">${escHtml(v.title || v.id)}</span>
-          <a class="vid-id yt-link" href="https://www.youtube.com/watch?v=${escHtml(v.id)}" target="_blank" rel="noopener">${escHtml(v.id)}</a>
+          <span class="meta-right">
+            <a class="vid-id yt-link text-muted" href="https://www.youtube.com/watch?v=${escHtml(v.id)}" target="_blank" rel="noopener">↗ ${escHtml(v.id)}</a>
+            <button class="play-btn" title="jump to this video">▶</button>
+          </span>
         </div>
         <div class="slider-wrap">
           <div class="slider-range"></div>
           <input class="start-range" type="range" min="0" max="${max}" step="1" value="${startV}">
           <input class="stop-range"  type="range" min="0" max="${max}" step="1" value="${stopV}">
         </div>
-        <div class="times">
+        <div class="times text-dim">
           <span>Start <input class="start-time time-input" type="text"></span>
-          <span style="color:#444">${fmt(max)}</span>
+          <span class="text-faint">${fmt(max)}</span>
           <span>Stop <input class="stop-time time-input" type="text"> <span class="stop-early"></span></span>
+        </div>
+        <div class="pos-wrap" style="display:none">
+          <div class="pos-slider-wrap">
+            <div class="pos-fill"></div>
+            <input class="pos-range" type="range" min="0" max="${max}" step="1" value="0">
+          </div>
+          <div class="times text-muted">
+            <span>Now Playing</span>
+            <span class="pos-display">0:00</span>
+          </div>
         </div>
       </div>`;
 
@@ -333,6 +442,15 @@
     li.querySelector('.stop-range').addEventListener('input', onStopInput);
     li.querySelector('.start-time').addEventListener('change', onStartTimeChange);
     li.querySelector('.stop-time').addEventListener('change', onStopTimeChange);
+    li.querySelector('.pos-range').addEventListener('input', onPosInput);
+    li.querySelector('.pos-range').addEventListener('change', onPosChange);
+    li.querySelector('.play-btn').addEventListener('click', async () => {
+      const seconds = parseFloat(li.querySelector('.start-range').value) || 0;
+      try {
+        const st = await jump(v.id, seconds);
+        setActive(st.video_id, st.seconds);
+      } catch {}
+    });
 
     // Prevent slider/input interactions from triggering drag
     li.querySelectorAll('input').forEach(input => {
@@ -409,7 +527,7 @@
     videos = data;
     list.innerHTML = '';
     if (!videos.length) {
-      list.innerHTML = '<li id="status">No videos in schedule.</li>';
+      list.innerHTML = '<li id="status" class="text-muted">No videos in schedule.</li>';
       return;
     }
     videos.forEach(v => list.appendChild(buildCard(v)));
@@ -420,8 +538,12 @@
   // -----------------------------------------------------------------------
 
   loadSchedule()
-    .then(render)
-    .catch(() => { list.innerHTML = '<li id="status">Failed to load schedule.</li>'; });
+    .then(async data => {
+      render(data);
+      const st = await loadState();
+      if (st) setActive(st.video_id, st.seconds);
+    })
+    .catch(() => { list.innerHTML = '<li id="status" class="text-muted">Failed to load schedule.</li>'; });
 </script>
 </body>
 </html>

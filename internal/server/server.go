@@ -30,6 +30,11 @@ type progressRequest struct {
 	Seconds float64 `json:"seconds"`
 }
 
+type jumpRequest struct {
+	VideoID string  `json:"video_id"`
+	Seconds float64 `json:"seconds"`
+}
+
 // scheduleItem is the wire format for a single video in the schedule API.
 // Seconds values are used instead of duration strings for easy JS consumption.
 type scheduleItem struct {
@@ -51,6 +56,7 @@ func Mount(r chi.Router, sched *schedule.Schedule, schedPath string, st *state.S
 	r.Post("/api/schedule", schedulePostHandler(sched, schedPath))
 	r.Post("/api/progress", progressHandler(st))
 	r.Post("/api/next", nextHandler(sched, st))
+	r.Post("/api/jump", jumpHandler(sched, st))
 	r.Handle("/*", http.FileServer(http.Dir("static")))
 }
 
@@ -157,6 +163,27 @@ func schedulePostHandler(sched *schedule.Schedule, schedPath string) http.Handle
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func jumpHandler(sched *schedule.Schedule, st *state.State) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req jumpRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.VideoID == "" {
+			http.Error(w, "invalid body", http.StatusBadRequest)
+			return
+		}
+		if _, ok := sched.Find(req.VideoID); !ok {
+			http.Error(w, "video not in schedule", http.StatusBadRequest)
+			return
+		}
+		st.Jump(req.VideoID, req.Seconds)
+		resp, ok := currentState(sched, st)
+		if !ok {
+			http.Error(w, "current video not in schedule", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, resp, http.StatusOK)
 	}
 }
 
