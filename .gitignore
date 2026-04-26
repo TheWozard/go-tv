@@ -1,5 +1,14 @@
+# ai
+.claude
+
 # binary
 go-tv
 
-# runtime state — restored on shutdown, not source-controlled
+# runtime data — not source-controlled
 state.json
+schedule.json
+
+# generated favicon assets (regenerate with scripts/gen-favicon.sh)
+static/favicon*.png
+static/favicon.ico
+static/apple-touch-icon.png
