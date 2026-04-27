@@ -1,4 +1,4 @@
-package server
+package api
 
 import (
 	"encoding/json"
@@ -7,9 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"go-tv/internal/integration"
-	"go-tv/internal/schedule"
-	"go-tv/internal/state"
+	"go-tv/internal/channel"
 )
 
 // -------------------------------------------------------------------------
@@ -61,14 +59,20 @@ type scheduleItem struct {
 // Server
 // -------------------------------------------------------------------------
 
-type Server struct {
-	Schedule     *schedule.Schedule
-	SchedulePath string
-	State        *state.State
-	Manager      *integration.Manager
+func OpenChannel(r chi.Router, schedule *channel.Schedule, state *channel.State) {
+	channel := &Channel{
+		Schedule: schedule,
+		State:    state,
+	}
+	channel.Route(r)
 }
 
-func (s *Server) Route(r chi.Router) {
+type Channel struct {
+	Schedule *channel.Schedule
+	State    *channel.State
+}
+
+func (s *Channel) Route(r chi.Router) {
 	r.Get("/edit", s.editHandler)
 	r.Get("/api/state", s.stateHandler)
 	r.Get("/api/schedule", s.scheduleGetHandler)
@@ -76,8 +80,6 @@ func (s *Server) Route(r chi.Router) {
 	r.Post("/api/progress", s.progressHandler)
 	r.Post("/api/next", s.nextHandler)
 	r.Post("/api/jump", s.jumpHandler)
-	r.Get("/api/integrations", s.integrationsHandler)
-	r.Post("/api/integrations/{name}", s.activateIntegrationHandler)
 	r.Handle("/*", http.FileServer(http.Dir("static")))
 }
 
@@ -91,22 +93,27 @@ func writeJSON(w http.ResponseWriter, v any, code int) {
 	json.NewEncoder(w).Encode(v)
 }
 
-func (s *Server) currentState() (stateResponse, bool) {
-	videoID, seconds := s.State.Get()
+func (s *Channel) currentState() (stateResponse, bool) {
+	videoID, pos := s.State.Get()
 	video, ok := s.Schedule.Find(videoID)
 	if !ok {
 		return stateResponse{}, false
 	}
+	frag, hasFrag := video.Current(pos)
+	stopSecs := 0.0
+	if hasFrag {
+		stopSecs = frag.End.Seconds()
+	}
 	return stateResponse{
-		VideoID:     video.ID,
-		Seconds:     seconds,
-		StopSeconds: video.StopSecondsAt(seconds),
+		VideoID:     video.Source.ID,
+		Seconds:     pos.Seconds(),
+		StopSeconds: stopSecs,
 	}, true
 }
 
-func videoToWire(v schedule.Video) scheduleVideo {
+func videoToWire(v channel.Video) scheduleVideo {
 	w := scheduleVideo{
-		ID:            v.ID,
+		ID:            v.Source.ID,
 		Title:         v.Title,
 		LengthSeconds: v.Length.Seconds(),
 	}
@@ -123,20 +130,20 @@ func videoToWire(v schedule.Video) scheduleVideo {
 	return w
 }
 
-func wireToVideo(w scheduleVideo) schedule.Video {
-	v := schedule.Video{
-		ID:     w.ID,
+func wireToVideo(w scheduleVideo) channel.Video {
+	v := channel.Video{
+		Source: channel.NewSource(w.ID),
 		Title:  w.Title,
-		Length: schedule.Duration{Duration: time.Duration(w.LengthSeconds * float64(time.Second)).Truncate(time.Second)},
+		Length: channel.Duration{Duration: time.Duration(w.LengthSeconds * float64(time.Second)).Truncate(time.Second)},
 	}
 	for _, ws := range w.Segments {
-		seg := schedule.Segment{}
+		seg := channel.Segment{}
 		if ws.StartSeconds > 0 {
-			d := schedule.Duration{Duration: time.Duration(ws.StartSeconds * float64(time.Second)).Truncate(time.Second)}
+			d := channel.Duration{Duration: time.Duration(ws.StartSeconds * float64(time.Second)).Truncate(time.Second)}
 			seg.Start = &d
 		}
 		if ws.EndSeconds > 0 {
-			d := schedule.Duration{Duration: time.Duration(ws.EndSeconds * float64(time.Second)).Truncate(time.Second)}
+			d := channel.Duration{Duration: time.Duration(ws.EndSeconds * float64(time.Second)).Truncate(time.Second)}
 			seg.End = &d
 		}
 		v.Segments = append(v.Segments, seg)
@@ -144,7 +151,7 @@ func wireToVideo(w scheduleVideo) schedule.Video {
 	return v
 }
 
-func itemToWire(it schedule.Item) scheduleItem {
+func itemToWire(it channel.Playlist) scheduleItem {
 	videos := make([]scheduleVideo, len(it.Videos))
 	for i, v := range it.Videos {
 		videos[i] = videoToWire(v)
@@ -152,46 +159,23 @@ func itemToWire(it schedule.Item) scheduleItem {
 	return scheduleItem{Name: it.Name, Videos: videos}
 }
 
-func wireToItem(w scheduleItem) schedule.Item {
-	videos := make([]schedule.Video, len(w.Videos))
+func wireToItem(w scheduleItem) channel.Playlist {
+	videos := make([]channel.Video, len(w.Videos))
 	for i, v := range w.Videos {
 		videos[i] = wireToVideo(v)
 	}
-	return schedule.Item{Name: w.Name, Videos: videos}
+	return channel.Playlist{Name: w.Name, Videos: videos}
 }
 
 // -------------------------------------------------------------------------
 // Handlers
 // -------------------------------------------------------------------------
 
-func (s *Server) integrationsHandler(w http.ResponseWriter, r *http.Request) {
-	type entry struct {
-		Name   string `json:"name"`
-		Active bool   `json:"active"`
-	}
-	active := s.Manager.Active()
-	names := s.Manager.Names()
-	entries := make([]entry, len(names))
-	for i, n := range names {
-		entries[i] = entry{Name: n, Active: n == active}
-	}
-	writeJSON(w, map[string]any{"integrations": entries}, http.StatusOK)
-}
-
-func (s *Server) activateIntegrationHandler(w http.ResponseWriter, r *http.Request) {
-	name := chi.URLParam(r, "name")
-	if err := s.Manager.Activate(name); err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (s *Server) editHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Channel) editHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "static/edit.html")
 }
 
-func (s *Server) stateHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Channel) stateHandler(w http.ResponseWriter, r *http.Request) {
 	resp, ok := s.currentState()
 	if !ok {
 		http.Error(w, "current video not in schedule", http.StatusInternalServerError)
@@ -200,7 +184,7 @@ func (s *Server) stateHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, resp, http.StatusOK)
 }
 
-func (s *Server) scheduleGetHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Channel) scheduleGetHandler(w http.ResponseWriter, r *http.Request) {
 	its := s.Schedule.AllItems()
 	entries := make([]scheduleItem, len(its))
 	for i, it := range its {
@@ -209,7 +193,7 @@ func (s *Server) scheduleGetHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"items": entries}, http.StatusOK)
 }
 
-func (s *Server) schedulePostHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Channel) schedulePostHandler(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Items []scheduleItem `json:"items"`
 	}
@@ -219,14 +203,14 @@ func (s *Server) schedulePostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build a lookup of existing videos so we can preserve segments.
-	existing := make(map[string]schedule.Video)
+	existing := make(map[string]channel.Video)
 	for _, v := range s.Schedule.All() {
-		existing[v.ID] = v
+		existing[v.Source.ID] = v
 	}
 
-	items := make([]schedule.Item, len(body.Items))
+	items := make([]channel.Playlist, len(body.Items))
 	for i, entry := range body.Items {
-		videos := make([]schedule.Video, len(entry.Videos))
+		videos := make([]channel.Video, len(entry.Videos))
 		for j, wv := range entry.Videos {
 			if ev, ok := existing[wv.ID]; ok {
 				// Preserve existing video data (segments, length); allow title/name changes.
@@ -236,27 +220,37 @@ func (s *Server) schedulePostHandler(w http.ResponseWriter, r *http.Request) {
 				videos[j] = wireToVideo(wv)
 			}
 		}
-		items[i] = schedule.Item{Name: entry.Name, Videos: videos}
+		items[i] = channel.Playlist{Name: entry.Name, Videos: videos}
 	}
 	s.Schedule.Update(items)
-	if err := s.Schedule.Save(s.SchedulePath); err != nil {
+	if err := s.Schedule.Save(); err != nil {
 		http.Error(w, "failed to save schedule", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) jumpHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Channel) progressHandler(w http.ResponseWriter, r *http.Request) {
+	var req progressRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.VideoID == "" {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	s.State.SetPosition(channel.NewSource(req.VideoID), time.Duration(req.Seconds*float64(time.Second)))
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Channel) jumpHandler(w http.ResponseWriter, r *http.Request) {
 	var req jumpRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.VideoID == "" {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	if _, ok := s.Schedule.Find(req.VideoID); !ok {
+	if _, ok := s.Schedule.Find(channel.NewSource(req.VideoID)); !ok {
 		http.Error(w, "video not in schedule", http.StatusBadRequest)
 		return
 	}
-	s.State.Jump(req.VideoID, req.Seconds)
+	s.State.Jump(channel.NewSource(req.VideoID), time.Duration(req.Seconds*float64(time.Second)))
 	resp, ok := s.currentState()
 	if !ok {
 		http.Error(w, "current video not in schedule", http.StatusInternalServerError)
@@ -265,29 +259,19 @@ func (s *Server) jumpHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, resp, http.StatusOK)
 }
 
-func (s *Server) progressHandler(w http.ResponseWriter, r *http.Request) {
-	var req progressRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.VideoID == "" {
-		http.Error(w, "invalid body", http.StatusBadRequest)
-		return
-	}
-	s.State.SetPosition(req.VideoID, req.Seconds)
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (s *Server) nextHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Channel) nextHandler(w http.ResponseWriter, r *http.Request) {
 	var req nextRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.VideoID == "" {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
 	pos := time.Duration(req.Seconds * float64(time.Second))
-	frag, ok := s.Schedule.Next(req.VideoID, pos)
+	frag, ok := s.Schedule.Next(channel.NewSource(req.VideoID), pos)
 	if !ok {
 		http.Error(w, "no next fragment found", http.StatusInternalServerError)
 		return
 	}
-	s.State.Advance(req.VideoID, frag.ID, frag.Start.Seconds())
+	s.State.Advance(channel.NewSource(req.VideoID), frag.Source, frag.Start)
 	resp, ok := s.currentState()
 	if !ok {
 		http.Error(w, "current video not in schedule", http.StatusInternalServerError)

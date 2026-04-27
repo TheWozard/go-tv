@@ -1,47 +1,33 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"io/fs"
+	"net/http"
 	"os"
 
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	Port         string        `yaml:"port"`
 	SchedulePath string        `yaml:"schedule"`
 	StatePath    string        `yaml:"state"`
 	Tailscale    Tailscale     `yaml:"tailscale"`
-	Integrations []Integration `yaml:"integrations"`
-}
-
-type Tailscale struct {
-	Hostname string `yaml:"hostname"`
-	Dir      string `yaml:"dir"`
-	Port     string `yaml:"port"`
-}
-
-func (t Tailscale) Enabled() bool { return t.Hostname != "" }
-
-type Integration struct {
-	Name      string `yaml:"name"`
-	URL       string `yaml:"url"`
-	Token     string `yaml:"token"`
-	EntityID  string `yaml:"entity_id"`
-	MediaType string `yaml:"media_type"` // passed to HA play_media; defaults to "url"
+	Server       Server        `yaml:"server"`
 }
 
 // Load reads a YAML config file and returns a Config with defaults applied.
 // If the file does not exist it returns the default config without error.
 func Load(path string) (*Config, error) {
 	cfg := &Config{
-		Port:         "8080",
 		SchedulePath: "schedule.json",
 		StatePath:    "state.json",
 		Tailscale: Tailscale{
-			Dir:  "/var/lib/tailscale",
-			Port: "443",
+			Dir: "/var/lib/tailscale",
+		},
+		Server: Server{
+			Port: "8080",
 		},
 	}
 
@@ -57,15 +43,28 @@ func Load(path string) (*Config, error) {
 		return nil, err
 	}
 
+	cfg.ApplyEnvOverrides()
 	return cfg, nil
 }
 
 // ApplyEnvOverrides lets environment variables take precedence over YAML values.
 func (c *Config) ApplyEnvOverrides() {
 	if v := os.Getenv("PORT"); v != "" {
-		c.Port = v
+		c.Server.Port = v
+		c.Tailscale.Port = v
 	}
 	if v := os.Getenv("TS_HOSTNAME"); v != "" {
 		c.Tailscale.Hostname = v
 	}
+}
+
+type ServerListener interface {
+	Listen(context.Context, http.Handler) error
+}
+
+func (c *Config) GetServerListener() ServerListener {
+	if c.Tailscale.Enabled() {
+		return c.Tailscale
+	}
+	return c.Server
 }

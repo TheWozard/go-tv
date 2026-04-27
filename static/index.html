@@ -38,11 +38,6 @@
       font-size: 1rem;
       padding: 12px 28px;
     }
-    .start-divider {
-      color: #333;
-      font-size: .75rem;
-      margin: 4px 0;
-    }
     #player-wrapper { position: fixed; inset: 0; display: none; }
     #player-wrapper iframe { width: 100%; height: 100%; border: none; }
     #edit-link {
@@ -300,41 +295,14 @@
       });
     }
 
-    async function startIntegration(name) {
-      await fetch(`/api/integrations/${encodeURIComponent(name)}`, { method: 'POST' });
-    }
-
-    async function renderStartScreen() {
+    (function renderStartScreen() {
       const screen = document.getElementById('start-screen');
-      let integrations = [];
-      try {
-        const res = await fetch('/api/integrations');
-        if (res.ok) ({ integrations } = await res.json());
-      } catch {}
-
       const watchBtn = document.createElement('button');
       watchBtn.className = 'start-btn primary';
       watchBtn.textContent = '▶ Watch Here';
       watchBtn.addEventListener('click', startHere);
       screen.appendChild(watchBtn);
-
-      if (integrations.length > 0) {
-        const divider = document.createElement('div');
-        divider.className = 'start-divider';
-        divider.textContent = 'or play on';
-        screen.appendChild(divider);
-
-        for (const { name } of integrations) {
-          const btn = document.createElement('button');
-          btn.className = 'start-btn';
-          btn.textContent = name;
-          btn.addEventListener('click', () => startIntegration(name));
-          screen.appendChild(btn);
-        }
-      }
-    }
-
-    renderStartScreen();
+    })();
   </script>
   <script src="https://www.youtube.com/iframe_api" async></script>
 </body>

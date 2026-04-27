@@ -22,7 +22,7 @@ import (
 	"os/exec"
 	"time"
 
-	"go-tv/internal/schedule"
+	"go-tv/internal/channel"
 )
 
 // ytInfo holds the fields we use from yt-dlp's JSON output.
@@ -47,9 +47,9 @@ func main() {
 		log.Fatal("no videos found")
 	}
 
-	sched, err := schedule.Load(*schedPath)
+	sched, err := channel.LoadSchedule(*schedPath)
 	if os.IsNotExist(err) {
-		sched = &schedule.Schedule{}
+		sched = channel.NewSchedule(*schedPath)
 	} else if err != nil {
 		log.Fatal(err)
 	}
@@ -59,26 +59,26 @@ func main() {
 		name = entries[0].Title
 	}
 
-	videos := make([]schedule.Video, len(entries))
+	videos := make([]channel.Video, len(entries))
 	for i, e := range entries {
 		videos[i] = toVideo(e)
-		fmt.Printf("  + %-20s  %s\n", videos[i].ID, videos[i].Title)
+		fmt.Printf("  + %-20s  %s\n", videos[i].Source.ID, videos[i].Title)
 	}
 
-	items := append(sched.AllItems(), schedule.Item{Name: name, Videos: videos})
+	items := append(sched.AllItems(), channel.Playlist{Name: name, Videos: videos})
 	fmt.Printf("added %q (%d video(s))\n", name, len(videos))
 	sched.Update(items)
 
-	if err := sched.Save(*schedPath); err != nil {
+	if err := sched.Save(); err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("appended to %s\n", *schedPath)
 }
 
-func toVideo(e ytInfo) schedule.Video {
-	v := schedule.Video{ID: e.ID, Title: e.Title}
+func toVideo(e ytInfo) channel.Video {
+	v := channel.Video{Source: channel.NewSource(e.ID), Title: e.Title}
 	if e.Duration != nil && *e.Duration > 0 {
-		d := schedule.Duration{Duration: time.Duration(*e.Duration * float64(time.Second)).Truncate(time.Second)}
+		d := channel.Duration{Duration: time.Duration(*e.Duration * float64(time.Second)).Truncate(time.Second)}
 		v.Length = d
 	}
 	return v

@@ -24,8 +24,8 @@ import (
 	"strings"
 	"time"
 
-	"go-tv/internal/schedule"
-	"go-tv/internal/sponsorblock"
+	"go-tv/internal/channel"
+	"go-tv/internal/client/sponsorblock"
 )
 
 func main() {
@@ -41,7 +41,7 @@ func main() {
 	}
 	videoID := flag.Arg(0)
 
-	sched, err := schedule.Load(*schedPath)
+	sched, err := channel.LoadSchedule(*schedPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -112,14 +112,14 @@ func main() {
 	}
 
 	// Find the video's length from the schedule.
-	video, ok := sched.Find(videoID)
+	video, ok := sched.Find(channel.NewSource(videoID))
 	if !ok {
 		fmt.Fprintf(os.Stderr, "video %s not found in schedule\n", videoID)
 		os.Exit(1)
 	}
 	videoLength := video.Length.Duration
 
-	var newSegments []schedule.Segment
+	var newSegments []channel.Segment
 	if len(cuts) > 0 {
 		// Sort cuts by start time and merge overlapping.
 		sort.Slice(cuts, func(i, j int) bool { return cuts[i].start < cuts[j].start })
@@ -149,7 +149,7 @@ func main() {
 		}
 
 		// Clean up redundant values and empty segments.
-		v := &schedule.Video{Segments: newSegments, Length: video.Length}
+		v := &channel.Video{Segments: newSegments, Length: video.Length}
 		v.Clean()
 		newSegments = v.Segments
 	}
@@ -176,27 +176,27 @@ func main() {
 	items := sched.AllItems()
 	for i, item := range items {
 		for j, v := range item.Videos {
-			if v.ID == videoID {
+			if v.Source.ID == videoID {
 				items[i].Videos[j].Segments = newSegments
 			}
 		}
 	}
 
 	sched.Update(items)
-	if err := sched.Save(*schedPath); err != nil {
+	if err := sched.Save(); err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("\nsaved to %s\n", *schedPath)
 }
 
-func makeSegment(start, end time.Duration) schedule.Segment {
-	seg := schedule.Segment{}
+func makeSegment(start, end time.Duration) channel.Segment {
+	seg := channel.Segment{}
 	if start > 0 {
-		d := schedule.Duration{Duration: start}
+		d := channel.Duration{Duration: start}
 		seg.Start = &d
 	}
 	if end > 0 {
-		d := schedule.Duration{Duration: end}
+		d := channel.Duration{Duration: end}
 		seg.End = &d
 	}
 	return seg

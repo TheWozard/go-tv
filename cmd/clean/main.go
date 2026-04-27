@@ -10,14 +10,14 @@ import (
 	"fmt"
 	"log"
 
-	"go-tv/internal/schedule"
+	"go-tv/internal/channel"
 )
 
 func main() {
 	schedPath := flag.String("s", "schedule.json", "path to schedule file")
 	flag.Parse()
 
-	sched, err := schedule.Load(*schedPath)
+	sched, err := channel.LoadSchedule(*schedPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -30,7 +30,7 @@ func main() {
 	}
 
 	sched.Update(items)
-	if err := sched.Save(*schedPath); err != nil {
+	if err := sched.Save(); err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("cleaned %s\n", *schedPath)

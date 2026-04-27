@@ -11,25 +11,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"go-tv/internal/api"
+	"go-tv/internal/channel"
 	"go-tv/internal/config"
-	"go-tv/internal/integration"
-	"go-tv/internal/player/homeassistant"
-	"go-tv/internal/schedule"
-	"go-tv/internal/server"
-	"go-tv/internal/state"
 )
-
-func setupHandlers(r chi.Router, cfg *config.Config, sched *schedule.Schedule, st *state.State, mgr *integration.Manager) {
-	r.Use(middleware.Recoverer)
-
-	s := &server.Server{
-		Schedule:     sched,
-		SchedulePath: cfg.SchedulePath,
-		State:        st,
-		Manager:      mgr,
-	}
-	s.Route(r)
-}
 
 func main() {
 	configPath := flag.String("config", "./config.yaml", "path to config file")
@@ -39,48 +24,26 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}
-	cfg.ApplyEnvOverrides()
 
-	schedule, err := schedule.Load(cfg.SchedulePath)
+	schedule, err := channel.LoadSchedule(cfg.SchedulePath)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to load schedule: %v", err)
 	}
-
-	currentState := state.Load(cfg.StatePath, schedule)
-	log.Printf("starting with state: %s", currentState.String())
+	currentState := channel.LoadState(cfg.StatePath, schedule)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	mgr := integration.NewManager(ctx, schedule, currentState)
-	for _, integ := range cfg.Integrations {
-		p := homeassistant.New(homeassistant.Config{
-			URL:       integ.URL,
-			Token:     integ.Token,
-			EntityID:  integ.EntityID,
-			MediaType: integ.MediaType,
-		})
-		mgr.Register(integ.Name, p)
-		log.Printf("registered integration %q (%s)", integ.Name, integ.EntityID)
-	}
-
 	r := chi.NewRouter()
-	setupHandlers(r, cfg, schedule, currentState, mgr)
+	r.Use(middleware.Recoverer)
+	api.OpenChannel(r, schedule, currentState)
 
-	var startErr error
-	if cfg.Tailscale.Enabled() {
-		startErr = server.StartTailscale(ctx, r, cfg.Tailscale.Hostname, cfg.Tailscale.Dir, cfg.Tailscale.Port)
-	} else {
-		startErr = server.StartHTTP(ctx, r, cfg.Port)
-	}
-	if startErr != nil {
-		log.Fatal(startErr)
+	if err = cfg.GetServerListener().Listen(ctx, r); err != nil {
+		log.Fatal(err)
 	}
 
-	log.Println("shutting down…")
-	if err := currentState.Save(cfg.StatePath); err != nil {
+	log.Println("shutting down")
+	if err := currentState.Save(); err != nil {
 		log.Printf("failed to save state: %v", err)
-	} else {
-		log.Println("state saved to", cfg.StatePath)
 	}
 }
