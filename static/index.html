@@ -149,11 +149,11 @@
      * (first caller wins). Returns the new global state regardless.
      * Throws on a non-OK response.
      */
-    async function postNext(videoId) {
+    async function postNext(videoId, seconds) {
       const res = await fetch('/api/next', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ video_id: videoId }),
+        body: JSON.stringify({ video_id: videoId, seconds }),
       });
       if (!res.ok) throw new Error('failed to advance');
       return res.json();
@@ -175,7 +175,9 @@
       if (advancing) return;
       advancing = true;
       try {
-        const next = await postNext(currentVideoId);
+        const seconds = (player && typeof player.getCurrentTime === 'function')
+          ? player.getCurrentTime() : 0;
+        const next = await postNext(currentVideoId, seconds);
         applyState(next);
       } catch (e) {
         player?.pauseVideo();

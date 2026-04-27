@@ -2,12 +2,14 @@
 .claude
 
 # binary
-go-tv
+/go-tv
+/append
+/sponsorblock
+/clean
 
 # runtime data — not source-controlled
-config.yaml
-state.json
-schedule.json
+/*.yaml
+/*.json
 
 # generated favicon assets (regenerate with scripts/gen-favicon.sh)
 static/favicon*.png

@@ -26,7 +26,8 @@ func New(videoID string) *State {
 }
 
 func Load(path string, sched *schedule.Schedule) *State {
-	def := &State{VideoID: sched.First().ID}
+	first, _ := sched.First()
+	def := &State{VideoID: first.ID}
 	f, err := os.Open(path)
 	if err != nil {
 		return def

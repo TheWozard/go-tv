@@ -23,7 +23,8 @@ type stateResponse struct {
 }
 
 type nextRequest struct {
-	VideoID string `json:"video_id"`
+	VideoID string  `json:"video_id"`
+	Seconds float64 `json:"seconds"`
 }
 
 type progressRequest struct {
@@ -36,13 +37,18 @@ type jumpRequest struct {
 	Seconds float64 `json:"seconds"`
 }
 
+// wireSegment is the wire format for a playback segment.
+type wireSegment struct {
+	StartSeconds float64 `json:"start_seconds"`
+	EndSeconds   float64 `json:"end_seconds,omitempty"`
+}
+
 // scheduleVideo is the wire format for a single video within an item.
 type scheduleVideo struct {
-	ID            string  `json:"id,omitempty"`
-	Title         string  `json:"title,omitempty"`
-	StartSeconds  float64 `json:"start_seconds,omitempty"`
-	StopSeconds   float64 `json:"stop_seconds,omitempty"`
-	LengthSeconds float64 `json:"length_seconds,omitempty"`
+	ID            string        `json:"id,omitempty"`
+	Title         string        `json:"title,omitempty"`
+	Segments      []wireSegment `json:"segments,omitempty"`
+	LengthSeconds float64       `json:"length_seconds,omitempty"`
 }
 
 // scheduleItem is the wire format for a schedule item (named group of videos).
@@ -94,7 +100,7 @@ func (s *Server) currentState() (stateResponse, bool) {
 	return stateResponse{
 		VideoID:     video.ID,
 		Seconds:     seconds,
-		StopSeconds: video.Stop.Seconds(),
+		StopSeconds: video.StopSecondsAt(seconds),
 	}, true
 }
 
@@ -102,12 +108,17 @@ func videoToWire(v schedule.Video) scheduleVideo {
 	w := scheduleVideo{
 		ID:            v.ID,
 		Title:         v.Title,
-		StartSeconds:  v.StartSeconds(),
-		StopSeconds:   v.Stop.Seconds(),
 		LengthSeconds: v.Length.Seconds(),
 	}
-	if w.StopSeconds == 0 {
-		w.StopSeconds = w.LengthSeconds
+	for _, seg := range v.Segments {
+		ws := wireSegment{}
+		if seg.Start != nil {
+			ws.StartSeconds = seg.Start.Seconds()
+		}
+		if seg.End != nil {
+			ws.EndSeconds = seg.End.Seconds()
+		}
+		w.Segments = append(w.Segments, ws)
 	}
 	return w
 }
@@ -116,12 +127,19 @@ func wireToVideo(w scheduleVideo) schedule.Video {
 	v := schedule.Video{
 		ID:     w.ID,
 		Title:  w.Title,
-		Stop:   schedule.Duration{Duration: time.Duration(w.StopSeconds * float64(time.Second)).Truncate(time.Second)},
 		Length: schedule.Duration{Duration: time.Duration(w.LengthSeconds * float64(time.Second)).Truncate(time.Second)},
 	}
-	if w.StartSeconds > 0 {
-		d := schedule.Duration{Duration: time.Duration(w.StartSeconds * float64(time.Second)).Truncate(time.Second)}
-		v.Start = &d
+	for _, ws := range w.Segments {
+		seg := schedule.Segment{}
+		if ws.StartSeconds > 0 {
+			d := schedule.Duration{Duration: time.Duration(ws.StartSeconds * float64(time.Second)).Truncate(time.Second)}
+			seg.Start = &d
+		}
+		if ws.EndSeconds > 0 {
+			d := schedule.Duration{Duration: time.Duration(ws.EndSeconds * float64(time.Second)).Truncate(time.Second)}
+			seg.End = &d
+		}
+		v.Segments = append(v.Segments, seg)
 	}
 	return v
 }
@@ -199,9 +217,26 @@ func (s *Server) schedulePostHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
+
+	// Build a lookup of existing videos so we can preserve segments.
+	existing := make(map[string]schedule.Video)
+	for _, v := range s.Schedule.All() {
+		existing[v.ID] = v
+	}
+
 	items := make([]schedule.Item, len(body.Items))
 	for i, entry := range body.Items {
-		items[i] = wireToItem(entry)
+		videos := make([]schedule.Video, len(entry.Videos))
+		for j, wv := range entry.Videos {
+			if ev, ok := existing[wv.ID]; ok {
+				// Preserve existing video data (segments, length); allow title/name changes.
+				ev.Title = wv.Title
+				videos[j] = ev
+			} else {
+				videos[j] = wireToVideo(wv)
+			}
+		}
+		items[i] = schedule.Item{Name: entry.Name, Videos: videos}
 	}
 	s.Schedule.Update(items)
 	if err := s.Schedule.Save(s.SchedulePath); err != nil {
@@ -246,12 +281,13 @@ func (s *Server) nextHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	next, err := s.Schedule.Next(req.VideoID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	pos := time.Duration(req.Seconds * float64(time.Second))
+	frag, ok := s.Schedule.Next(req.VideoID, pos)
+	if !ok {
+		http.Error(w, "no next fragment found", http.StatusInternalServerError)
 		return
 	}
-	s.State.Advance(req.VideoID, next.ID, next.StartSeconds())
+	s.State.Advance(req.VideoID, frag.ID, frag.Start.Seconds())
 	resp, ok := s.currentState()
 	if !ok {
 		http.Error(w, "current video not in schedule", http.StatusInternalServerError)

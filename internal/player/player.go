@@ -39,9 +39,10 @@ const stateCheckInterval = 2 * time.Second
 // even between player events.
 func Run(ctx context.Context, p Player, sched *schedule.Schedule, st *state.State) {
 	var (
-		events      <-chan Event
-		playCancel  context.CancelFunc
+		events     <-chan Event
+		playCancel context.CancelFunc
 		activeVideo string
+		activeStop  float64 // current segment stop point (0 = full length)
 	)
 
 	cancel := func() {
@@ -51,16 +52,18 @@ func Run(ctx context.Context, p Player, sched *schedule.Schedule, st *state.Stat
 		}
 		events = nil
 		activeVideo = ""
+		activeStop = 0
 	}
 
-	advance := func() {
-		next, err := sched.Next(activeVideo)
-		if err != nil {
-			log.Printf("player: next: %v", err)
+	advance := func(seconds float64) {
+		pos := time.Duration(seconds * float64(time.Second))
+		frag, ok := sched.Next(activeVideo, pos)
+		if !ok {
+			log.Printf("player: next: no fragment found")
 			cancel()
 			return
 		}
-		st.Advance(activeVideo, next.ID, next.StartSeconds())
+		st.Advance(activeVideo, frag.ID, frag.Start.Seconds())
 		cancel()
 	}
 
@@ -74,6 +77,7 @@ func Run(ctx context.Context, p Player, sched *schedule.Schedule, st *state.Stat
 		if !ok {
 			return true
 		}
+		activeStop = video.StopSecondsAt(seconds)
 		playCtx, playCancel2 := context.WithCancel(ctx)
 		playCancel = playCancel2
 		ch, err := p.Play(playCtx, *video, seconds)
@@ -109,15 +113,12 @@ func Run(ctx context.Context, p Player, sched *schedule.Schedule, st *state.Stat
 
 		case ev, ok := <-events:
 			if !ok || !ev.Playing {
-				advance()
+				advance(ev.Seconds)
 				continue
 			}
 			st.SetPosition(activeVideo, ev.Seconds)
-			video, ok := sched.Find(activeVideo)
-			if ok {
-				if stop := video.Stop.Seconds(); stop > 0 && ev.Seconds >= stop {
-					advance()
-				}
+			if activeStop > 0 && ev.Seconds >= activeStop {
+				advance(ev.Seconds)
 			}
 		}
 	}

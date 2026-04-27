@@ -79,7 +79,6 @@ func toVideo(e ytInfo) schedule.Video {
 	v := schedule.Video{ID: e.ID, Title: e.Title}
 	if e.Duration != nil && *e.Duration > 0 {
 		d := schedule.Duration{Duration: time.Duration(*e.Duration * float64(time.Second)).Truncate(time.Second)}
-		v.Stop = d
 		v.Length = d
 	}
 	return v

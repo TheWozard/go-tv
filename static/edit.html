@@ -84,28 +84,23 @@
     .title { font-weight: 500; color: #eee; }
     .vid-id { font-size: .75rem; font-family: monospace; }
 
-    /* ---- sliders (shared) ---- */
-    .slider-wrap,
+    /* ---- position slider ---- */
     .pos-slider-wrap {
       position: relative;
       height: 4px;
       background: #2a2a2a;
       border-radius: 2px;
+      margin: 8px 0;
     }
-    .slider-wrap     { margin: 18px 0 10px; }
-    .pos-slider-wrap { margin: 8px 0; }
 
-    .slider-range,
     .pos-fill {
       position: absolute;
       height: 100%;
       border-radius: 2px;
       pointer-events: none;
+      background: #22c55e;
     }
-    .slider-range { background: #2563eb; }
-    .pos-fill     { background: #22c55e; }
 
-    .slider-wrap input[type=range],
     .pos-slider-wrap input[type=range] {
       position: absolute;
       width: 100%;
@@ -120,9 +115,7 @@
       -webkit-appearance: none;
       appearance: none;
     }
-    .slider-wrap input[type=range] { pointer-events: none; }
 
-    .slider-wrap input[type=range]::-webkit-slider-thumb,
     .pos-slider-wrap input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none;
       width: 14px;
@@ -130,11 +123,9 @@
       border-radius: 50%;
       cursor: grab;
       box-shadow: 0 1px 3px rgba(0,0,0,.5);
+      background: #22c55e;
     }
-    .slider-wrap input[type=range]::-webkit-slider-thumb     { pointer-events: auto; background: #fff; }
-    .pos-slider-wrap input[type=range]::-webkit-slider-thumb { background: #22c55e; }
 
-    .slider-wrap input[type=range]::-moz-range-thumb,
     .pos-slider-wrap input[type=range]::-moz-range-thumb {
       width: 14px;
       height: 14px;
@@ -142,11 +133,9 @@
       cursor: grab;
       border: none;
       box-shadow: 0 1px 3px rgba(0,0,0,.5);
+      background: #22c55e;
     }
-    .slider-wrap input[type=range]::-moz-range-thumb     { pointer-events: auto; background: #fff; }
-    .pos-slider-wrap input[type=range]::-moz-range-thumb { background: #22c55e; }
 
-    .slider-wrap input[type=range]:active::-webkit-slider-thumb,
     .pos-slider-wrap input[type=range]:active::-webkit-slider-thumb { cursor: grabbing; }
 
     .times {
@@ -154,19 +143,6 @@
       justify-content: space-between;
       font-size: .75rem;
     }
-    .time-input {
-      background: none;
-      border: none;
-      border-bottom: 1px solid #444;
-      color: #aaa;
-      font-size: .75rem;
-      font-family: inherit;
-      width: 40px;
-      text-align: center;
-      padding: 0 2px;
-      outline: none;
-    }
-    .time-input:focus { border-bottom-color: #2563eb; color: #eee; }
     .yt-link { font-size: .75rem; text-decoration: none; }
     .yt-link:hover { color: #c44; }
 
@@ -386,79 +362,6 @@
     }
   }
 
-  // -----------------------------------------------------------------------
-  // Slider
-  // -----------------------------------------------------------------------
-
-  function updateSlider(card) {
-    const start  = card.querySelector('.start-range');
-    const stop   = card.querySelector('.stop-range');
-    const range  = card.querySelector('.slider-range');
-    const max    = parseFloat(start.max) || 1;
-    const startV = parseFloat(start.value);
-    const stopV  = parseFloat(stop.value);
-
-    const leftPct  = (startV / max) * 100;
-    const rightPct = (stopV  / max) * 100;
-    range.style.left  = leftPct + '%';
-    range.style.width = (rightPct - leftPct) + '%';
-
-    card.querySelector('.start-time').value = fmt(startV);
-    card.querySelector('.stop-time').value  = fmt(stopV);
-    card.querySelector('.stop-early').textContent = `-${Math.round(max - stopV)}s`;
-  }
-
-  function onStartInput(e) {
-    const card = e.target.closest('.card');
-    const stop = card.querySelector('.stop-range');
-    if (parseFloat(e.target.value) >= parseFloat(stop.value)) {
-      e.target.value = Math.max(0, parseFloat(stop.value) - 1);
-    }
-    updateSlider(card);
-    syncVideoFromCard(card);
-    markDirty();
-  }
-
-  function onStopInput(e) {
-    const card = e.target.closest('.card');
-    const start = card.querySelector('.start-range');
-    if (parseFloat(e.target.value) <= parseFloat(start.value)) {
-      e.target.value = Math.min(parseFloat(e.target.max), parseFloat(start.value) + 1);
-    }
-    updateSlider(card);
-    syncVideoFromCard(card);
-    markDirty();
-  }
-
-  function parseFmt(str) {
-    const parts = String(str).trim().split(':');
-    if (parts.length === 2) return parseFloat(parts[0]) * 60 + parseFloat(parts[1]);
-    return parseFloat(str) || 0;
-  }
-
-  function onStartTimeChange(e) {
-    const card = e.target.closest('.card');
-    const startRange = card.querySelector('.start-range');
-    const stopRange  = card.querySelector('.stop-range');
-    let v = parseFmt(e.target.value);
-    v = Math.max(0, Math.min(v, parseFloat(stopRange.value) - 1));
-    startRange.value = v;
-    updateSlider(card);
-    syncVideoFromCard(card);
-    markDirty();
-  }
-
-  function onStopTimeChange(e) {
-    const card = e.target.closest('.card');
-    const startRange = card.querySelector('.start-range');
-    const stopRange  = card.querySelector('.stop-range');
-    let v = parseFmt(e.target.value);
-    v = Math.min(parseFloat(stopRange.max), Math.max(v, parseFloat(startRange.value) + 1));
-    stopRange.value = v;
-    updateSlider(card);
-    syncVideoFromCard(card);
-    markDirty();
-  }
 
   // -----------------------------------------------------------------------
   // Build card DOM
@@ -469,9 +372,7 @@
     li.className = 'card';
     li.dataset.id = v.id;
 
-    const max    = v.length_seconds || v.stop_seconds || 600;
-    const startV = v.start_seconds  || 0;
-    const stopV  = v.stop_seconds   || max;
+    const max = v.length_seconds || 600;
 
     li.innerHTML = `
       <div class="handle" title="drag to reorder">⠿</div>
@@ -482,16 +383,6 @@
             <a class="vid-id yt-link text-muted" href="https://www.youtube.com/watch?v=${escHtml(v.id)}" target="_blank" rel="noopener">↗ ${escHtml(v.id)}</a>
             <button class="play-btn" title="jump to this video">▶</button>
           </span>
-        </div>
-        <div class="slider-wrap">
-          <div class="slider-range"></div>
-          <input class="start-range" type="range" min="0" max="${max}" step="1" value="${startV}">
-          <input class="stop-range"  type="range" min="0" max="${max}" step="1" value="${stopV}">
-        </div>
-        <div class="times text-dim">
-          <span>Start <input class="start-time time-input" type="text"></span>
-          <span class="text-faint">${fmt(max)}</span>
-          <span>Stop <input class="stop-time time-input" type="text"> <span class="stop-early"></span></span>
         </div>
         <div class="pos-wrap" style="display:none">
           <div class="pos-slider-wrap">
@@ -505,16 +396,11 @@
         </div>
       </div>`;
 
-    li.querySelector('.start-range').addEventListener('input', onStartInput);
-    li.querySelector('.stop-range').addEventListener('input', onStopInput);
-    li.querySelector('.start-time').addEventListener('change', onStartTimeChange);
-    li.querySelector('.stop-time').addEventListener('change', onStopTimeChange);
     li.querySelector('.pos-range').addEventListener('input', onPosInput);
     li.querySelector('.pos-range').addEventListener('change', onPosChange);
     li.querySelector('.play-btn').addEventListener('click', async () => {
-      const seconds = parseFloat(li.querySelector('.start-range').value) || 0;
       try {
-        const st = await jump(v.id, seconds);
+        const st = await jump(v.id, 0);
         setActive(st.video_id, st.seconds);
       } catch {}
     });
@@ -525,7 +411,6 @@
     });
 
     initDrag(li);
-    updateSlider(li);
     return li;
   }
 
@@ -534,15 +419,8 @@
   }
 
   // -----------------------------------------------------------------------
-  // Sync card → videos array
+  // Collect order for saving
   // -----------------------------------------------------------------------
-
-  function syncVideoFromCard(card) {
-    const v = findVideoById(card.dataset.id);
-    if (!v) return;
-    v.start_seconds = parseFloat(card.querySelector('.start-range').value);
-    v.stop_seconds  = parseFloat(card.querySelector('.stop-range').value);
-  }
 
   function collectOrder() {
     return [...list.querySelectorAll(':scope > .set-item')].map(el => ({

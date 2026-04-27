@@ -2,7 +2,7 @@ package schedule
 
 import (
 	"encoding/json"
-	"fmt"
+	"iter"
 	"os"
 	"sync"
 	"time"
@@ -29,20 +29,101 @@ func (d Duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.Duration.String())
 }
 
-// Video is a single playable entry.
-type Video struct {
-	ID     string    `json:"id"`
-	Title  string    `json:"title,omitempty"`
-	Start  *Duration `json:"start,omitempty"`
-	Stop   Duration  `json:"stop"`
-	Length Duration  `json:"length"`
+// Segment defines a playback window within a video.
+// Start/End are pointers so zero values (play from start / play to end) are omitted.
+type Segment struct {
+	Start *Duration `json:"start,omitempty"`
+	End   *Duration `json:"end,omitempty"`
 }
 
-func (v *Video) StartSeconds() float64 {
-	if v.Start == nil {
+// StartDuration returns the segment's start, defaulting to 0.
+func (seg Segment) StartDuration() time.Duration {
+	if seg.Start == nil {
 		return 0
 	}
-	return v.Start.Seconds()
+	return seg.Start.Duration
+}
+
+func (seg Segment) EndDuration(def time.Duration) time.Duration {
+	if seg.End == nil {
+		return def
+	}
+	return seg.End.Duration
+}
+
+// Video is a single playable entry.
+type Video struct {
+	ID       string    `json:"id"`
+	Title    string    `json:"title,omitempty"`
+	Segments []Segment `json:"segments,omitempty"`
+	Length   Duration  `json:"length"`
+}
+
+// Current returns the [Fragment] of the video that the position is a part of.
+// If the position is between [Fragments], the next Fragment is returned.
+// Returns false when position is after all [Fragments]
+func (v Video) Current(position time.Duration) (Fragment, bool) {
+	if len(v.Segments) > 0 {
+		for _, seg := range v.Segments {
+			if seg.StartDuration() < position {
+				return Fragment{
+					ID:    v.ID,
+					Start: seg.StartDuration(),
+					End:   seg.EndDuration(v.Length.Duration),
+				}, true
+			}
+		}
+	} else if position < v.Length.Duration {
+		return Fragment{
+			ID:    v.ID,
+			Start: 0,
+			End:   v.Length.Duration,
+		}, true
+	}
+	return Fragment{}, false
+}
+
+// Next returns the [Fragment] of the video that is next after the position.
+// If the position is currently inside of a [Fragment], the next [Fragment] is returned.
+// Returns false when position is after the start of the last [Fragment] even if it is
+// before the end.
+func (v Video) Next(position time.Duration) (Fragment, bool) {
+	if len(v.Segments) > 0 {
+		for _, seg := range v.Segments {
+			if seg.StartDuration() > position {
+				return Fragment{
+					ID:    v.ID,
+					Start: seg.StartDuration(),
+					End:   seg.EndDuration(v.Length.Duration),
+				}, true
+			}
+		}
+	} else if position == 0 {
+		return Fragment{
+			ID:    v.ID,
+			Start: 0,
+			End:   v.Length.Duration,
+		}, true
+	}
+	return Fragment{}, false
+}
+
+// Clean removes redundant start=0 and end=length values from segments,
+// then drops any segments that become empty. Modifies the video in place.
+func (v *Video) Clean() {
+	var cleaned []Segment
+	for _, s := range v.Segments {
+		if s.Start != nil && s.Start.Duration == 0 {
+			s.Start = nil
+		}
+		if s.End != nil && s.End.Duration == v.Length.Duration {
+			s.End = nil
+		}
+		if s.Start != nil || s.End != nil {
+			cleaned = append(cleaned, s)
+		}
+	}
+	v.Segments = cleaned
 }
 
 // Item is a named group of one or more videos.
@@ -83,20 +164,91 @@ func (s *Schedule) Save(path string) error {
 	return enc.Encode(s)
 }
 
-// flat returns all videos in playback order. Must be called with lock held.
-func (s *Schedule) flat() []Video {
-	var out []Video
-	for _, item := range s.Items {
-		out = append(out, item.Videos...)
+// iter returns an iterator over all videos in playback order.
+// Must be called with lock held.
+func (s *Schedule) iter() iter.Seq[Video] {
+	return func(yield func(Video) bool) {
+		for _, item := range s.Items {
+			for _, v := range item.Videos {
+				if !yield(v) {
+					return
+				}
+			}
+		}
 	}
-	return out
+}
+
+func (s *Schedule) Find(videoID string) (*Video, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for v := range s.iter() {
+		if v.ID == videoID {
+			return &v, true
+		}
+	}
+	return nil, false
+}
+
+// Fragment describes the next piece of video to play.
+type Fragment struct {
+	ID    string
+	Start time.Duration
+	End   time.Duration
+}
+
+// First returns the first possible [Fragment] for the current schedule
+func (s *Schedule) First() (Fragment, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for v := range s.iter() {
+		if f, ok := v.Next(0); ok {
+			return f, true
+		}
+	}
+	return Fragment{}, false
+}
+
+func (s *Schedule) Current(videoID string, position time.Duration) (Fragment, bool) {
+	return s.findFragment(videoID, position, Video.Current)
+}
+
+func (s *Schedule) Next(videoID string, position time.Duration) (Fragment, bool) {
+	return s.findFragment(videoID, position, Video.Next)
+}
+
+func (s *Schedule) findFragment(videoID string, position time.Duration, check func(Video, time.Duration) (Fragment, bool)) (Fragment, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	found := false
+	for v := range s.iter() {
+		if found {
+			if f, ok := check(v, 0); ok {
+				return f, true
+			}
+			continue
+		}
+
+		if v.ID != videoID {
+			continue
+		}
+		if f, ok := check(v, position); ok {
+			return f, true
+		}
+		found = true
+	}
+	return s.First()
 }
 
 // All returns the flat playback order, safe for concurrent use.
 func (s *Schedule) All() []Video {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.flat()
+	var out []Video
+	for v := range s.iter() {
+		out = append(out, v)
+	}
+	return out
 }
 
 // AllItems returns a shallow copy of the items slice, safe for concurrent use.
@@ -113,40 +265,4 @@ func (s *Schedule) Update(items []Item) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.Items = items
-}
-
-func (s *Schedule) First() *Video {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	vs := s.flat()
-	if len(vs) == 0 {
-		return nil
-	}
-	v := vs[0]
-	return &v
-}
-
-func (s *Schedule) Find(videoID string) (*Video, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	for _, v := range s.flat() {
-		if v.ID == videoID {
-			vCopy := v
-			return &vCopy, true
-		}
-	}
-	return nil, false
-}
-
-func (s *Schedule) Next(videoID string) (*Video, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	vs := s.flat()
-	for i, v := range vs {
-		if v.ID == videoID {
-			next := vs[(i+1)%len(vs)]
-			return &next, nil
-		}
-	}
-	return nil, fmt.Errorf("video %q not found in schedule", videoID)
 }
