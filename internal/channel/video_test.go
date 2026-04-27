@@ -17,7 +17,7 @@ func sec(n int) time.Duration { return time.Duration(n) * time.Second }
 
 func testVideo(segments ...Segment) Video {
 	return Video{
-		Source:   NewSource("v1"),
+		Source:   NewTestSource("v1"),
 		Title:    "test",
 		Segments: segments,
 		Length:   Duration{10 * time.Minute},
@@ -118,8 +118,8 @@ func TestVideo_Clean(t *testing.T) {
 	v := Video{
 		Length: Duration{length},
 		Segments: []Segment{
-			{Start: dur(0), End: dur(length)}, // both redundant → dropped
-			{Start: dur(0), End: dur(5 * time.Minute)}, // start redundant, end kept
+			{Start: dur(0), End: dur(length)},               // both redundant → dropped
+			{Start: dur(0), End: dur(5 * time.Minute)},      // start redundant, end kept
 			{Start: dur(3 * time.Minute), End: dur(length)}, // start kept, end redundant
 		},
 	}
@@ -142,7 +142,7 @@ func TestVideo_Clean_SetsSourceKind(t *testing.T) {
 
 func TestVideo_JSON_RoundTrip(t *testing.T) {
 	v := Video{
-		Source: NewSource("abc"),
+		Source: NewTestSource("abc"),
 		Title:  "Test Video",
 		Length: Duration{3*time.Minute + 30*time.Second},
 		Segments: []Segment{

@@ -1,23 +1,38 @@
 package channel
 
-import (
-	"bytes"
-	"encoding/json"
-)
-
 // SourceKind identifies the platform a video originates from.
 type SourceKind string
 
 const (
+	SourceKindTest    SourceKind = "test"
 	SourceKindYoutube SourceKind = "youtube"
 )
 
-// NewSource creates a YouTube source with the given video ID.
-func NewSource(id string) Source {
-	return Source{
-		Kind: SourceKindYoutube,
-		ID:   id,
+// newSource creates a source with the given kind and ID.
+func newSource(kind SourceKind, id string) Source {
+	return Source{Kind: kind, ID: id}
+}
+
+// NewValidatedSource creates a source after checking that kind is recognized
+// and id is non-empty. Returns false if either check fails.
+func NewValidatedSource(kind SourceKind, id string) (Source, bool) {
+	if id == "" {
+		return Source{}, false
 	}
+	switch kind {
+	case SourceKindYoutube, SourceKindTest:
+		return newSource(kind, id), true
+	default:
+		return Source{}, false
+	}
+}
+
+func NewTestSource(id string) Source {
+	return newSource(SourceKindTest, id)
+}
+
+func NewYoutubeSource(id string) Source {
+	return newSource(SourceKindYoutube, id)
 }
 
 // Source identifies a video on a specific platform.
@@ -31,33 +46,4 @@ type Source struct {
 // Equal reports whether two sources refer to the same video.
 func (s Source) Equal(o Source) bool {
 	return s.Kind == o.Kind && s.ID == o.ID
-}
-
-// Clean fills in missing fields with defaults (YouTube kind).
-func (s *Source) Clean() {
-	if s.Kind == "" {
-		s.Kind = SourceKindYoutube
-	}
-}
-
-// UnmarshalJSON supports both the legacy bare-string format ("videoID") and
-// the full object format ({"kind":"youtube","id":"videoID"}).
-func (s *Source) UnmarshalJSON(b []byte) error {
-	if bytes.IndexRune(b, '"') == 0 {
-		// Legacy format
-		var id string
-		if err := json.Unmarshal(b, &id); err != nil {
-			return err
-		}
-		s.ID = id
-		s.Clean()
-	} else {
-		type raw Source // prevents infinite recursion
-		var ingest raw
-		if err := json.Unmarshal(b, &ingest); err != nil {
-			return err
-		}
-		*s = Source(ingest)
-	}
-	return nil
 }

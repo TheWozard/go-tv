@@ -19,7 +19,7 @@ func playlist(name string, ids ...string) Playlist {
 	videos := make([]Video, len(ids))
 	for i, id := range ids {
 		videos[i] = Video{
-			Source: NewSource(id),
+			Source: NewTestSource(id),
 			Title:  id,
 			Length: Duration{10 * time.Minute},
 		}
@@ -32,11 +32,11 @@ func playlist(name string, ids ...string) Playlist {
 func TestSchedule_Find(t *testing.T) {
 	s := newTestSchedule(playlist("p1", "a", "b"), playlist("p2", "c"))
 
-	v, ok := s.Find(NewSource("b"))
+	v, ok := s.Find(NewTestSource("b"))
 	assert.True(t, ok)
 	assert.Equal(t, "b", v.Source.ID)
 
-	_, ok = s.Find(NewSource("missing"))
+	_, ok = s.Find(NewTestSource("missing"))
 	assert.False(t, ok)
 }
 
@@ -89,12 +89,12 @@ func TestSchedule_Update(t *testing.T) {
 func TestSchedule_Current(t *testing.T) {
 	s := newTestSchedule(playlist("p1", "a", "b"))
 
-	frag, ok := s.Current(NewSource("a"), sec(30))
+	frag, ok := s.Current(NewTestSource("a"), sec(30))
 	assert.True(t, ok)
 	assert.Equal(t, "a", frag.Source.ID)
 
 	// Past end of "a" advances to "b"
-	frag, ok = s.Current(NewSource("a"), 11*time.Minute)
+	frag, ok = s.Current(NewTestSource("a"), 11*time.Minute)
 	assert.True(t, ok)
 	assert.Equal(t, "b", frag.Source.ID, "should advance to next video")
 }
@@ -103,7 +103,7 @@ func TestSchedule_Next(t *testing.T) {
 	s := newTestSchedule(playlist("p1", "a", "b"))
 
 	// Mid-video advances to next video
-	frag, ok := s.Next(NewSource("a"), sec(30))
+	frag, ok := s.Next(NewTestSource("a"), sec(30))
 	assert.True(t, ok)
 	assert.Equal(t, "b", frag.Source.ID, "should advance to next video")
 	assert.Equal(t, time.Duration(0), frag.Start)
@@ -113,7 +113,7 @@ func TestSchedule_Next_WrapsAround(t *testing.T) {
 	s := newTestSchedule(playlist("p1", "a", "b"))
 
 	// Past last video wraps to first
-	frag, ok := s.Next(NewSource("b"), sec(30))
+	frag, ok := s.Next(NewTestSource("b"), sec(30))
 	assert.True(t, ok)
 	assert.Equal(t, "a", frag.Source.ID, "should wrap to first video")
 }
@@ -122,7 +122,7 @@ func TestSchedule_Next_MissingVideo(t *testing.T) {
 	s := newTestSchedule(playlist("p1", "a"))
 
 	// Missing video wraps to first
-	frag, ok := s.Next(NewSource("missing"), 0)
+	frag, ok := s.Next(NewTestSource("missing"), 0)
 	assert.True(t, ok)
 	assert.Equal(t, "a", frag.Source.ID)
 }
@@ -161,7 +161,7 @@ func TestSchedule_JSON_Structure(t *testing.T) {
 	s := &Schedule{
 		Playlists: []Playlist{
 			{Name: "My Playlist", Videos: []Video{
-				{Source: NewSource("abc"), Title: "Test", Length: Duration{time.Minute}},
+				{Source: NewTestSource("abc"), Title: "Test", Length: Duration{time.Minute}},
 			}},
 		},
 	}

@@ -112,7 +112,7 @@ func main() {
 	}
 
 	// Find the video's length from the schedule.
-	video, ok := sched.Find(channel.NewSource(videoID))
+	video, ok := sched.Find(channel.NewYoutubeSource(videoID))
 	if !ok {
 		fmt.Fprintf(os.Stderr, "video %s not found in schedule\n", videoID)
 		os.Exit(1)

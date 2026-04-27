@@ -110,7 +110,11 @@ func (s *Schedule) Next(id Source, position time.Duration) (Fragment, bool) {
 	return s.findFragment(id, position, Video.Next)
 }
 
-func (s *Schedule) findFragment(id Source, position time.Duration, check func(Video, time.Duration) (Fragment, bool)) (Fragment, bool) {
+func (s *Schedule) findFragment(source Source, position time.Duration, check func(Video, time.Duration) (Fragment, bool)) (Fragment, bool) {
+	if source.Equal(Source{}) {
+		return s.First()
+	}
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -123,7 +127,7 @@ func (s *Schedule) findFragment(id Source, position time.Duration, check func(Vi
 			continue
 		}
 
-		if !v.Source.Equal(id) {
+		if !v.Source.Equal(source) {
 			continue
 		}
 		if f, ok := check(v, position); ok {

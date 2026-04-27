@@ -4,7 +4,7 @@ import "time"
 
 // Video is a single playable entry.
 type Video struct {
-	Source   Source    `json:"id"`
+	Source   Source    `json:"source"`
 	Title    string    `json:"title,omitempty"`
 	Segments []Segment `json:"segments,omitempty"`
 	Length   Duration  `json:"length"`
@@ -75,7 +75,6 @@ func (v *Video) Clean() {
 		}
 	}
 	v.Segments = cleaned
-	v.Source.Clean()
 }
 
 // Segment defines a playback window within a video.

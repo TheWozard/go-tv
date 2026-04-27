@@ -13,7 +13,7 @@ type State struct {
 	mu   sync.RWMutex
 	path string
 
-	ID       Source   `json:"id"`
+	Source   Source   `json:"source"`
 	Position Duration `json:"position"`
 }
 
@@ -32,8 +32,8 @@ func LoadState(path string, schedule *Schedule) *State {
 	if err := json.NewDecoder(f).Decode(&state); err != nil {
 		return first.toState(path)
 	}
-	if current, ok := schedule.Current(state.ID, state.Position.Duration); ok {
-		if current.Start > state.Position.Duration {
+	if current, ok := schedule.Current(state.Source, state.Position.Duration); ok {
+		if !current.Source.Equal(state.Source) || current.Start > state.Position.Duration {
 			return current.toState(path)
 		}
 		state.path = path
@@ -58,36 +58,36 @@ func (s *State) Save() error {
 func (s *State) Get() (Source, time.Duration) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.ID, s.Position.Duration
+	return s.Source, s.Position.Duration
 }
 
 // SetPosition updates the playback position for the current video.
 // The update is ignored if id does not match the current source (stale report).
-func (s *State) SetPosition(id Source, position time.Duration) {
+func (s *State) SetPosition(source Source, position time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.ID.Equal(id) {
+	if !s.Source.Equal(source) {
 		return
 	}
 	s.Position.Duration = position
 }
 
 // Jump unconditionally moves playback to a new source and position.
-func (s *State) Jump(id Source, position time.Duration) {
+func (s *State) Jump(source Source, position time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.ID = id
+	s.Source = source
 	s.Position.Duration = position
 }
 
 // Advance transitions to the next fragment. The transition is ignored if
-// currentID does not match the active source (another advance already occurred).
-func (s *State) Advance(currentID, nextID Source, position time.Duration) {
+// currentSource does not match the active source (another advance already occurred).
+func (s *State) Advance(currentSource, nextSource Source, position time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.ID.Equal(currentID) {
+	if !s.Source.Equal(currentSource) {
 		return
 	}
-	s.ID = nextID
+	s.Source = nextSource
 	s.Position.Duration = position
 }

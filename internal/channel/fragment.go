@@ -13,7 +13,7 @@ type Fragment struct {
 func (f Fragment) toState(path string) *State {
 	return &State{
 		path:     path,
-		ID:       f.Source,
+		Source:   f.Source,
 		Position: Duration{f.Start},
 	}
 }

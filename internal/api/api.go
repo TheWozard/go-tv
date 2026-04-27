@@ -132,7 +132,7 @@ func videoToWire(v channel.Video) scheduleVideo {
 
 func wireToVideo(w scheduleVideo) channel.Video {
 	v := channel.Video{
-		Source: channel.NewSource(w.ID),
+		Source: channel.NewYoutubeSource(w.ID),
 		Title:  w.Title,
 		Length: channel.Duration{Duration: time.Duration(w.LengthSeconds * float64(time.Second)).Truncate(time.Second)},
 	}
@@ -236,7 +236,7 @@ func (s *Channel) progressHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	s.State.SetPosition(channel.NewSource(req.VideoID), time.Duration(req.Seconds*float64(time.Second)))
+	s.State.SetPosition(channel.NewYoutubeSource(req.VideoID), time.Duration(req.Seconds*float64(time.Second)))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -246,11 +246,11 @@ func (s *Channel) jumpHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	if _, ok := s.Schedule.Find(channel.NewSource(req.VideoID)); !ok {
+	if _, ok := s.Schedule.Find(channel.NewYoutubeSource(req.VideoID)); !ok {
 		http.Error(w, "video not in schedule", http.StatusBadRequest)
 		return
 	}
-	s.State.Jump(channel.NewSource(req.VideoID), time.Duration(req.Seconds*float64(time.Second)))
+	s.State.Jump(channel.NewYoutubeSource(req.VideoID), time.Duration(req.Seconds*float64(time.Second)))
 	resp, ok := s.currentState()
 	if !ok {
 		http.Error(w, "current video not in schedule", http.StatusInternalServerError)
@@ -266,12 +266,12 @@ func (s *Channel) nextHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pos := time.Duration(req.Seconds * float64(time.Second))
-	frag, ok := s.Schedule.Next(channel.NewSource(req.VideoID), pos)
+	frag, ok := s.Schedule.Next(channel.NewYoutubeSource(req.VideoID), pos)
 	if !ok {
 		http.Error(w, "no next fragment found", http.StatusInternalServerError)
 		return
 	}
-	s.State.Advance(channel.NewSource(req.VideoID), frag.Source, frag.Start)
+	s.State.Advance(channel.NewYoutubeSource(req.VideoID), frag.Source, frag.Start)
 	resp, ok := s.currentState()
 	if !ok {
 		http.Error(w, "current video not in schedule", http.StatusInternalServerError)

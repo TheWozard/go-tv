@@ -76,7 +76,7 @@ func main() {
 }
 
 func toVideo(e ytInfo) channel.Video {
-	v := channel.Video{Source: channel.NewSource(e.ID), Title: e.Title}
+	v := channel.Video{Source: channel.NewYoutubeSource(e.ID), Title: e.Title}
 	if e.Duration != nil && *e.Duration > 0 {
 		d := channel.Duration{Duration: time.Duration(*e.Duration * float64(time.Second)).Truncate(time.Second)}
 		v.Length = d
