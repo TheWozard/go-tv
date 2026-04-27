@@ -11,9 +11,7 @@ type Fragment struct {
 
 // toState converts this fragment into a persisted state snapshot.
 func (f Fragment) toState(path string) *State {
-	return &State{
-		path:     path,
-		Source:   f.Source,
-		Position: Duration{f.Start},
-	}
+	state := NewState(f.Source, f.Start)
+	state.SetFilePath(path)
+	return state
 }

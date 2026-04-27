@@ -7,6 +7,13 @@ import (
 	"time"
 )
 
+func NewState(source Source, position time.Duration) *State {
+	return &State{
+		Source:   source,
+		Position: Duration{position},
+	}
+}
+
 // State tracks the current playback position within the channel.
 // It is persisted to disk as JSON so playback survives restarts.
 type State struct {
@@ -90,4 +97,8 @@ func (s *State) Advance(currentSource, nextSource Source, position time.Duration
 	}
 	s.Source = nextSource
 	s.Position.Duration = position
+}
+
+func (s *State) SetFilePath(path string) {
+	s.path = path
 }

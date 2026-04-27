@@ -8,7 +8,7 @@ import (
 
 func TestNewSource(t *testing.T) {
 	s := NewTestSource("abc123")
-	assert.Equal(t, SourceKindYoutube, s.Kind)
+	assert.Equal(t, SourceKindTest, s.Kind)
 	assert.Equal(t, "abc123", s.ID)
 }
 

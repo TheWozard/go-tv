@@ -1,7 +1,8 @@
-package channel
+package channel_test
 
 import (
 	"encoding/json"
+	"go-tv/internal/channel"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,20 +12,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestSchedule(playlists ...Playlist) *Schedule {
-	return &Schedule{Playlists: playlists}
+func newTestSchedule(playlists ...channel.Playlist) *channel.Schedule {
+	return &channel.Schedule{Playlists: playlists}
 }
 
-func playlist(name string, ids ...string) Playlist {
-	videos := make([]Video, len(ids))
+func playlist(name string, ids ...string) channel.Playlist {
+	videos := make([]channel.Video, len(ids))
 	for i, id := range ids {
-		videos[i] = Video{
-			Source: NewTestSource(id),
+		videos[i] = channel.Video{
+			Source: channel.NewTestSource(id),
 			Title:  id,
-			Length: Duration{10 * time.Minute},
+			Length: channel.Duration{10 * time.Minute},
 		}
 	}
-	return Playlist{Name: name, Videos: videos}
+	return channel.Playlist{Name: name, Videos: videos}
 }
 
 // Find
@@ -32,11 +33,11 @@ func playlist(name string, ids ...string) Playlist {
 func TestSchedule_Find(t *testing.T) {
 	s := newTestSchedule(playlist("p1", "a", "b"), playlist("p2", "c"))
 
-	v, ok := s.Find(NewTestSource("b"))
+	v, ok := s.Find(channel.NewTestSource("b"))
 	assert.True(t, ok)
 	assert.Equal(t, "b", v.Source.ID)
 
-	_, ok = s.Find(NewTestSource("missing"))
+	_, ok = s.Find(channel.NewTestSource("missing"))
 	assert.False(t, ok)
 }
 
@@ -79,7 +80,7 @@ func TestSchedule_AllItems(t *testing.T) {
 
 func TestSchedule_Update(t *testing.T) {
 	s := newTestSchedule(playlist("old", "a"))
-	s.Update([]Playlist{playlist("new", "x", "y")})
+	s.Update([]channel.Playlist{playlist("new", "x", "y")})
 	assert.Len(t, s.All(), 2)
 	assert.Equal(t, "new", s.AllItems()[0].Name)
 }
@@ -89,12 +90,12 @@ func TestSchedule_Update(t *testing.T) {
 func TestSchedule_Current(t *testing.T) {
 	s := newTestSchedule(playlist("p1", "a", "b"))
 
-	frag, ok := s.Current(NewTestSource("a"), sec(30))
+	frag, ok := s.Current(channel.NewTestSource("a"), 30*time.Second)
 	assert.True(t, ok)
 	assert.Equal(t, "a", frag.Source.ID)
 
 	// Past end of "a" advances to "b"
-	frag, ok = s.Current(NewTestSource("a"), 11*time.Minute)
+	frag, ok = s.Current(channel.NewTestSource("a"), 11*time.Minute)
 	assert.True(t, ok)
 	assert.Equal(t, "b", frag.Source.ID, "should advance to next video")
 }
@@ -103,7 +104,7 @@ func TestSchedule_Next(t *testing.T) {
 	s := newTestSchedule(playlist("p1", "a", "b"))
 
 	// Mid-video advances to next video
-	frag, ok := s.Next(NewTestSource("a"), sec(30))
+	frag, ok := s.Next(channel.NewTestSource("a"), 30*time.Second)
 	assert.True(t, ok)
 	assert.Equal(t, "b", frag.Source.ID, "should advance to next video")
 	assert.Equal(t, time.Duration(0), frag.Start)
@@ -113,7 +114,7 @@ func TestSchedule_Next_WrapsAround(t *testing.T) {
 	s := newTestSchedule(playlist("p1", "a", "b"))
 
 	// Past last video wraps to first
-	frag, ok := s.Next(NewTestSource("b"), sec(30))
+	frag, ok := s.Next(channel.NewTestSource("b"), 30*time.Second)
 	assert.True(t, ok)
 	assert.Equal(t, "a", frag.Source.ID, "should wrap to first video")
 }
@@ -122,7 +123,7 @@ func TestSchedule_Next_MissingVideo(t *testing.T) {
 	s := newTestSchedule(playlist("p1", "a"))
 
 	// Missing video wraps to first
-	frag, ok := s.Next(NewTestSource("missing"), 0)
+	frag, ok := s.Next(channel.NewTestSource("missing"), 0)
 	assert.True(t, ok)
 	assert.Equal(t, "a", frag.Source.ID)
 }
@@ -131,40 +132,36 @@ func TestSchedule_Next_MissingVideo(t *testing.T) {
 
 func TestSchedule_SaveLoad(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "schedule.json")
-	s := &Schedule{
-		path:      path,
-		Playlists: []Playlist{playlist("p1", "a", "b")},
-	}
+	s := channel.NewSchedule(path, playlist("p1", "a", "b"))
 	require.NoError(t, s.Save())
 
-	loaded, err := LoadSchedule(path)
+	loaded, err := channel.LoadSchedule(path)
 	require.NoError(t, err)
 	assert.Len(t, loaded.All(), 2)
 	assert.Equal(t, "a", loaded.All()[0].Source.ID)
 }
 
 func TestLoadSchedule_NotFound(t *testing.T) {
-	_, err := LoadSchedule("/nonexistent/path.json")
+	_, err := channel.LoadSchedule("/nonexistent/path.json")
 	assert.Error(t, err)
 }
 
 func TestLoadSchedule_InvalidJSON(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "bad.json")
 	require.NoError(t, os.WriteFile(path, []byte(`{invalid`), 0644))
-	_, err := LoadSchedule(path)
+	_, err := channel.LoadSchedule(path)
 	assert.Error(t, err)
 }
 
-// Schedule JSON structure
+// channel.Schedule JSON structure
 
 func TestSchedule_JSON_Structure(t *testing.T) {
-	s := &Schedule{
-		Playlists: []Playlist{
-			{Name: "My Playlist", Videos: []Video{
-				{Source: NewTestSource("abc"), Title: "Test", Length: Duration{time.Minute}},
-			}},
-		},
-	}
+	s := channel.NewSchedule(
+		"",
+		channel.Playlist{Name: "My channel.Playlist", Videos: []channel.Video{
+			{Source: channel.NewTestSource("abc"), Title: "Test", Length: channel.Duration{time.Minute}},
+		}},
+	)
 	data, err := json.Marshal(s)
 	require.NoError(t, err)
 

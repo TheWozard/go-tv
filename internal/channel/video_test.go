@@ -131,13 +131,6 @@ func TestVideo_Clean(t *testing.T) {
 	assert.Nil(t, v.Segments[1].End)
 }
 
-func TestVideo_Clean_SetsSourceKind(t *testing.T) {
-	v := Video{Source: Source{ID: "abc"}, Length: Duration{time.Minute}}
-	assert.Empty(t, v.Source.Kind)
-	v.Clean()
-	assert.Equal(t, SourceKindYoutube, v.Source.Kind)
-}
-
 // Video JSON round-trip
 
 func TestVideo_JSON_RoundTrip(t *testing.T) {

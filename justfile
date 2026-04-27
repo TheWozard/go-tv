@@ -31,3 +31,6 @@ docker-run: docker-build
 clean:
     rm -f {{binary}}
     rm -f {{tar}}
+
+test:
+    go test ./...

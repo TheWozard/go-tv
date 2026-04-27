@@ -15,6 +15,13 @@ type Playlist struct {
 	Videos []Video `json:"videos"`
 }
 
+func NewSchedule(path string, playlists ...Playlist) *Schedule {
+	return &Schedule{
+		path:      path,
+		Playlists: playlists,
+	}
+}
+
 // Schedule is the ordered playlist of items that defines a channel's content.
 // It is persisted to disk as JSON and all methods are safe for concurrent use.
 type Schedule struct {
@@ -22,11 +29,6 @@ type Schedule struct {
 	path string
 
 	Playlists []Playlist `json:"playlists"`
-}
-
-// NewSchedule creates an empty schedule that will persist to path.
-func NewSchedule(path string) *Schedule {
-	return &Schedule{path: path}
 }
 
 // LoadSchedule reads and decodes a schedule from the given JSON file.
@@ -163,4 +165,8 @@ func (s *Schedule) Update(items []Playlist) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.Playlists = items
+}
+
+func (s *Schedule) SetFilePath(path string) {
+	s.path = path
 }
