@@ -212,6 +212,42 @@
     .set-item.active-set > .set-header { border-bottom-color: #22c55e44; }
     .set-item.active-set > .set-header .set-name-input { color: #22c55e; }
 
+    /* ---- segment timeline bar ---- */
+    .segs-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: -4px 0 8px;
+    }
+    .segs-bar-track {
+      flex: 1;
+      height: 4px;
+      background: #2a2a2a;
+      border-radius: 2px;
+      position: relative;
+      overflow: hidden;
+    }
+    .seg-chunk {
+      position: absolute;
+      height: 100%;
+      background: #2563eb88;
+      border-radius: 1px;
+    }
+    .sb-btn {
+      flex-shrink: 0;
+      background: none;
+      border: none;
+      color: #444;
+      cursor: pointer;
+      font-size: .65rem;
+      padding: 0;
+      line-height: 1;
+      font-family: inherit;
+      transition: color .15s;
+    }
+    .sb-btn:hover { color: #aaa; }
+    .sb-btn.open { color: #2563eb; }
+
     /* ---- position slider ---- */
     .pos-wrap {
       margin-top: 10px;
@@ -220,6 +256,67 @@
     }
     /* ---- empty / loading ---- */
     #status { text-align: center; padding: 60px 0; }
+
+    /* ---- sponsorblock panel ---- */
+    .sb-panel {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #222;
+    }
+    .sb-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .sb-panel-title { font-size: .7rem; color: #555; text-transform: uppercase; letter-spacing: .08em; }
+    .sb-close { background: none; border: none; color: #444; cursor: pointer; padding: 0; line-height: 1; font-size: .8rem; }
+    .sb-close:hover { color: #aaa; }
+
+    .sb-seg-list { list-style: none; display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+    .sb-seg-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 6px;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: background .1s;
+    }
+    .sb-seg-row:hover { background: #ffffff08; }
+    .sb-seg-row input[type=checkbox] { cursor: pointer; margin: 0; accent-color: #f59e0b; flex-shrink: 0; }
+    .sb-cat {
+      font-size: .7rem;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-weight: 500;
+      min-width: 80px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .sb-time { color: #777; font-size: .78rem; font-family: monospace; }
+    .sb-votes { color: #444; font-size: .7rem; margin-left: auto; }
+
+    .sb-footer {
+      display: flex;
+      gap: 6px;
+      padding-top: 6px;
+      border-top: 1px solid #1e1e1e;
+    }
+    .sb-footer button {
+      background: none;
+      border: 1px solid #2a2a2a;
+      color: #555;
+      cursor: pointer;
+      font-size: .75rem;
+      padding: 3px 10px;
+      border-radius: 3px;
+      font-family: inherit;
+      transition: color .15s, border-color .15s;
+    }
+    .sb-footer button:hover { color: #ccc; border-color: #555; }
+    .sb-apply-btn { color: #f59e0b !important; border-color: #f59e0b44 !important; }
+    .sb-apply-btn:hover { border-color: #f59e0b !important; }
   </style>
 </head>
 <body>
@@ -240,6 +337,21 @@
   let dirty = false;
 
   const list = document.getElementById('video-list');
+
+  // -----------------------------------------------------------------------
+  // SponsorBlock category colours
+  // -----------------------------------------------------------------------
+
+  const sbCatColors = {
+    sponsor:        { bg: '#00d40018', fg: '#4caf50' },
+    selfpromo:      { bg: '#cccc0018', fg: '#b8a800' },
+    interaction:    { bg: '#cc00ff18', fg: '#ab5ae6' },
+    intro:          { bg: '#00cccc18', fg: '#00aaaa' },
+    outro:          { bg: '#3333ff18', fg: '#6666ee' },
+    preview:        { bg: '#007bbd18', fg: '#008fd6' },
+    music_offtopic: { bg: '#ff990018', fg: '#e08800' },
+    filler:         { bg: '#7300ab18', fg: '#9b5dcc' },
+  };
 
   // -----------------------------------------------------------------------
   // API
@@ -277,6 +389,46 @@
       body: JSON.stringify({ items }),
     });
     if (!res.ok) throw new Error('failed to save');
+  }
+
+  async function fetchSBSegments(videoId) {
+    const res = await fetch(`/api/sponsorblock/${encodeURIComponent(videoId)}`);
+    if (!res.ok) throw new Error(`SponsorBlock error: ${res.status}`);
+    const data = await res.json();
+    return data.segments ?? [];
+  }
+
+  async function applySBCuts(videoId, cuts) {
+    const res = await fetch(`/api/sponsorblock/${encodeURIComponent(videoId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cuts }),
+    });
+    if (!res.ok) throw new Error('failed to apply');
+    const data = await res.json();
+    return data.segments ?? [];
+  }
+
+  // -----------------------------------------------------------------------
+  // Segment bar
+  // -----------------------------------------------------------------------
+
+  function renderSegsBar(li, video) {
+    const track = li.querySelector('.segs-bar-track');
+    const segs = video.segments;
+    const len = video.length_seconds || 1;
+    track.innerHTML = '';
+    if (!segs || !segs.length) return;
+    segs.forEach(seg => {
+      const start = seg.start_seconds || 0;
+      const end   = seg.end_seconds   || len;
+      const chunk = document.createElement('div');
+      chunk.className = 'seg-chunk';
+      chunk.style.left  = (start / len * 100) + '%';
+      chunk.style.width = ((end - start) / len * 100) + '%';
+      chunk.title = `${fmt(start)} → ${fmt(end)}`;
+      track.appendChild(chunk);
+    });
   }
 
   // -----------------------------------------------------------------------
@@ -384,6 +536,21 @@
             <button class="play-btn" title="jump to this video">▶</button>
           </span>
         </div>
+        <div class="segs-bar">
+          <div class="segs-bar-track"></div>
+          <button class="sb-btn" title="check SponsorBlock segments">SB</button>
+        </div>
+        <div class="sb-panel" style="display:none">
+          <div class="sb-panel-header">
+            <span class="sb-panel-title">SponsorBlock</span>
+            <button class="sb-close">✕</button>
+          </div>
+          <div class="sb-body text-muted">Loading…</div>
+          <div class="sb-footer" style="display:none">
+            <button class="sb-apply-btn">Apply selected</button>
+            <button class="sb-clear-btn">Clear segments</button>
+          </div>
+        </div>
         <div class="pos-wrap" style="display:none">
           <div class="pos-slider-wrap">
             <div class="pos-fill"></div>
@@ -405,9 +572,106 @@
       } catch {}
     });
 
-    // Prevent slider/input interactions from triggering drag
-    li.querySelectorAll('input').forEach(input => {
-      input.addEventListener('mousedown', e => e.stopPropagation());
+    // Prevent slider/button interactions from triggering drag
+    li.querySelectorAll('input, button').forEach(el => {
+      el.addEventListener('mousedown', e => e.stopPropagation());
+    });
+
+    renderSegsBar(li, v);
+
+    // --- SponsorBlock ---
+    const sbBtn    = li.querySelector('.sb-btn');
+    const sbPanel  = li.querySelector('.sb-panel');
+    const sbBody   = li.querySelector('.sb-body');
+    const sbFooter = li.querySelector('.sb-footer');
+    let sbSegs = null; // cached after first fetch
+
+    function sbClose() {
+      sbPanel.style.display = 'none';
+      sbBtn.classList.remove('open');
+    }
+
+    function sbRender(segs) {
+      if (!segs.length) {
+        sbBody.textContent = 'No segments found.';
+        sbBody.className = 'sb-body text-muted';
+        sbFooter.style.display = 'none';
+        return;
+      }
+      const ul = document.createElement('ul');
+      ul.className = 'sb-seg-list';
+      segs.forEach(seg => {
+        const row = document.createElement('li');
+        row.className = 'sb-seg-row';
+        const c = sbCatColors[seg.category] || { bg: '#33333322', fg: '#888' };
+        row.innerHTML = `
+          <input type="checkbox" class="sb-check" data-idx="${seg.index}" checked>
+          <span class="sb-cat" style="background:${c.bg};color:${c.fg}">${escHtml(seg.category)}</span>
+          <span class="sb-time">${fmt(seg.start_seconds)} → ${fmt(seg.end_seconds)}</span>
+          <span class="sb-votes">${seg.votes > 0 ? '+' : ''}${seg.votes}</span>`;
+        row.addEventListener('click', e => {
+          if (e.target.tagName !== 'INPUT') {
+            const cb = row.querySelector('.sb-check');
+            cb.checked = !cb.checked;
+          }
+        });
+        row.querySelector('input').addEventListener('mousedown', e => e.stopPropagation());
+        ul.appendChild(row);
+      });
+      sbBody.innerHTML = '';
+      sbBody.appendChild(ul);
+      sbBody.className = 'sb-body';
+      sbFooter.style.display = 'flex';
+    }
+
+    sbBtn.addEventListener('click', async () => {
+      if (sbPanel.style.display !== 'none') { sbClose(); return; }
+      sbPanel.style.display = '';
+      sbBtn.classList.add('open');
+      if (sbSegs !== null) { sbRender(sbSegs); return; }
+      sbBody.textContent = 'Loading…';
+      sbBody.className = 'sb-body text-muted';
+      sbFooter.style.display = 'none';
+      try {
+        sbSegs = await fetchSBSegments(v.id);
+        sbRender(sbSegs);
+      } catch {
+        sbBody.textContent = 'Failed to load segments.';
+        sbBody.className = 'sb-body text-muted';
+        sbSegs = null;
+      }
+    });
+
+    li.querySelector('.sb-close').addEventListener('click', sbClose);
+
+    li.querySelector('.sb-apply-btn').addEventListener('click', async () => {
+      const checked = new Set(
+        [...sbPanel.querySelectorAll('.sb-check:checked')].map(cb => parseInt(cb.dataset.idx))
+      );
+      const cuts = (sbSegs || [])
+        .filter(seg => checked.has(seg.index))
+        .map(seg => ({ start_seconds: seg.start_seconds, end_seconds: seg.end_seconds }));
+      try {
+        const newSegs = await applySBCuts(v.id, cuts);
+        const vid = findVideoById(v.id);
+        if (vid) { vid.segments = newSegs; renderSegsBar(li, vid); }
+        sbClose();
+      } catch {
+        sbBody.textContent = 'Failed to apply segments.';
+        sbBody.className = 'sb-body text-muted';
+      }
+    });
+
+    li.querySelector('.sb-clear-btn').addEventListener('click', async () => {
+      try {
+        const newSegs = await applySBCuts(v.id, []);
+        const vid = findVideoById(v.id);
+        if (vid) { vid.segments = newSegs; renderSegsBar(li, vid); }
+        sbClose();
+      } catch {
+        sbBody.textContent = 'Failed to clear segments.';
+        sbBody.className = 'sb-body text-muted';
+      }
     });
 
     initDrag(li);
