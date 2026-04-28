@@ -3,28 +3,29 @@ FROM golang:alpine AS builder
 
 WORKDIR /app
 
-# Install the tdewolff minify CLI for the HTML minification step.
-RUN go install github.com/tdewolff/minify/v2/cmd/minify@latest
+RUN apk add --no-cache nodejs npm
+RUN go install github.com/a-h/templ/cmd/templ@v0.3.1001
+
+COPY package.json package-lock.json ./
+RUN npm ci && cp node_modules/@starfederation/datastar/dist/datastar.js /tmp/datastar.js
 
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
+RUN mkdir -p static/vendor && cp /tmp/datastar.js static/vendor/datastar.js
+
+RUN templ generate ./internal/ui/...
 
 # Strip debug info and DWARF tables to reduce binary size.
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o go-tv .
 
-# Minify HTML in-place.
-RUN minify -o static/index.html static/index.html
-
 # ---- final image ----
-FROM alpine:latest
+FROM scratch
 
 WORKDIR /app
 
 COPY --from=builder /app/go-tv .
-COPY --from=builder /app/static ./static
-COPY --from=builder /app/schedule.json .
 
 # Mount a volume at /app to persist state.json across restarts,
 # or bind-mount just /app/state.json.

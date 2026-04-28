@@ -42,7 +42,8 @@ func main() {
 
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
-	api.OpenChannel(r, schedule, currentState)
+	ch := channel.NewChannel(schedule, currentState)
+	api.OpenChannel(r, ch)
 
 	sub, err := fs.Sub(staticFiles, "static")
 	if err != nil {
@@ -55,7 +56,7 @@ func main() {
 	}
 
 	log.Println("shutting down")
-	if err := currentState.Save(); err != nil {
+	if err := ch.SaveState(); err != nil {
 		log.Printf("failed to save state: %v", err)
 	}
 }

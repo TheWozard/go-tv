@@ -6,6 +6,11 @@ tar    := "go-tv.tar"
 icons:
     ./scripts/gen-favicon.sh
 
+# Install JS dependencies and copy bundles to static/
+vendor-js:
+    npm install
+    cp node_modules/@starfederation/datastar/dist/datastar.js static/vendor/datastar.js
+
 # Generate templ components
 generate:
     templ generate ./internal/ui/...

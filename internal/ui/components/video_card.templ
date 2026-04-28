@@ -53,7 +53,7 @@ templ VideoCard(v channel.Video, isActive bool, activeSeconds float64) {
 				<button
 					class="sb-btn"
 					title="check SponsorBlock segments"
-					data-on-click={ "@get('/api/sponsorblock/" + v.Source.ID + "')" }
+					data-on:click={ "@get('/api/sponsorblock/" + v.Source.ID + "')" }
 				>SB</button>
 			</div>
 			<div id={ "sb-panel-" + v.Source.ID }></div>

@@ -10,11 +10,17 @@
 # runtime data — not source-controlled
 /*.yaml
 /*.json
+!/package.json
+!/package-lock.json
 
 # generated favicon assets (regenerate with scripts/gen-favicon.sh)
 static/favicon*.png
 static/favicon.ico
 static/apple-touch-icon.png
+
+# JS dependencies (vendor with: just vendor-js)
+node_modules/
+static/vendor
 
 # generated templ output (regenerate with: templ generate ./internal/ui/...)
 *_templ.go

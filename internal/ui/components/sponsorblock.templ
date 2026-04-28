@@ -43,7 +43,7 @@ templ SponsorBlockPanel(videoID string, segs []SBSegment) {
 			<div class="sb-footer">
 				<button
 					class="sb-apply-btn"
-					data-on-click={ "@post('/api/sponsorblock/" + videoID + "', {contentType: 'application/json'})" }
+					data-on:click={ "@post('/api/sponsorblock/" + videoID + "', {contentType: 'application/json'})" }
 				>Apply selected</button>
 			</div>
 		}
