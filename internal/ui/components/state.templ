@@ -1,0 +1,14 @@
+package components
+
+import "fmt"
+
+// PlayerState is the SSE-pushed fragment that carries current playback state.
+// The YouTube bridge in player.js reads these data-* attributes via MutationObserver.
+templ PlayerState(videoID string, seconds, stopSeconds float64) {
+	<div
+		id="player-state"
+		data-video-id={ videoID }
+		data-seconds={ fmt.Sprintf("%g", seconds) }
+		data-stop-seconds={ fmt.Sprintf("%g", stopSeconds) }
+	></div>
+}

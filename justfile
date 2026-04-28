@@ -6,12 +6,16 @@ tar    := "go-tv.tar"
 icons:
     ./scripts/gen-favicon.sh
 
+# Generate templ components
+generate:
+    templ generate ./internal/ui/...
+
 # Build the Go binary
-build:
+build: generate
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o {{binary}} main.go
 
 # Development mode - run Go server
-dev:
+dev: generate
     go run main.go
 
 # Build Docker image

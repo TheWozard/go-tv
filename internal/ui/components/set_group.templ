@@ -1,0 +1,26 @@
+package components
+
+import "go-tv/internal/channel"
+
+templ SetGroup(set channel.Playlist, activeVideoID string, activeSeconds float64) {
+	{{ isActiveSet := false; for _, v := range set.Videos { if v.Source.ID == activeVideoID { isActiveSet = true; break } } }}
+	<li class={ "set-item collapsed", templ.KV("active-set", isActiveSet) }>
+		<div class="set-header">
+			<div class="handle text-faint" title="drag to reorder">⠿</div>
+			<button class="set-toggle" title="collapse/expand" onclick="this.closest('.set-item').classList.toggle('collapsed')">▶</button>
+			<input
+				class="set-name-input"
+				type="text"
+				value={ set.Name }
+				data-old-name={ set.Name }
+				onmousedown="event.stopPropagation()"
+				oninput="debounceRename(this)"
+			/>
+		</div>
+		<ul class="set-videos" id={ "set-videos-" + set.Name }>
+			for _, v := range set.Videos {
+				@VideoCard(v, v.Source.ID == activeVideoID, activeSeconds)
+			}
+		</ul>
+	</li>
+}

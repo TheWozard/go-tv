@@ -1,0 +1,87 @@
+package components
+
+import (
+	"fmt"
+	"go-tv/internal/channel"
+)
+
+templ VideoCard(v channel.Video, isActive bool, activeSeconds float64) {
+	{{ lenSecs := v.Length.Seconds() }}
+	{{ maxSecs := lenSecs; if maxSecs <= 0 { maxSecs = 600 } }}
+	<li
+		class={ "card", templ.KV("active", isActive) }
+		data-id={ v.Source.ID }
+	>
+		<div class="handle" title="drag to reorder">⠿</div>
+		<div class="body">
+			<div class="meta">
+				<span class="title">
+					if v.Title != "" {
+						{ v.Title }
+					} else {
+						{ v.Source.ID }
+					}
+				</span>
+				<span class="meta-right">
+					<a
+						class="vid-id yt-link text-muted"
+						href={ templ.URL("https://www.youtube.com/watch?v=" + v.Source.ID) }
+						target="_blank"
+						rel="noopener"
+					>↗ { v.Source.ID }</a>
+					<button
+						class="play-btn"
+						title="jump to this video"
+						onclick="jumpTo(this.closest('.card').dataset.id, 0)"
+					>▶</button>
+				</span>
+			</div>
+			<div class="segs-bar">
+				<div class="segs-bar-track">
+					for _, seg := range v.Segments {
+						{{ start := 0.0; if seg.Start != nil { start = seg.Start.Seconds() } }}
+						{{ end := lenSecs; if seg.End != nil { end = seg.End.Seconds() } }}
+						if lenSecs > 0 {
+							<div
+								class="seg-chunk"
+								style={ fmt.Sprintf("left:%.2f%%;width:%.2f%%", start/lenSecs*100, (end-start)/lenSecs*100) }
+								title={ fmt.Sprintf("%s → %s", fmtSecs(start), fmtSecs(end)) }
+							></div>
+						}
+					}
+				</div>
+				<button
+					class="sb-btn"
+					title="check SponsorBlock segments"
+					data-on-click={ "@get('/api/sponsorblock/" + v.Source.ID + "')" }
+				>SB</button>
+			</div>
+			<div id={ "sb-panel-" + v.Source.ID }></div>
+			if isActive {
+				<div class="pos-wrap">
+					<div class="pos-slider-wrap">
+						<div
+							class="pos-fill"
+							style={ fmt.Sprintf("width:%.2f%%", activeSeconds/maxSecs*100) }
+						></div>
+						<input
+							class="pos-range"
+							type="range"
+							min="0"
+							max={ fmt.Sprintf("%g", maxSecs) }
+							step="1"
+							value={ fmt.Sprintf("%g", activeSeconds) }
+							oninput="updatePosFill(this)"
+							onchange="jumpTo(this.closest('.card').dataset.id, this.value)"
+							onmousedown="event.stopPropagation()"
+						/>
+					</div>
+					<div class="times text-muted">
+						<span>Now Playing</span>
+						<span class="pos-display">{ fmtSecs(activeSeconds) }</span>
+					</div>
+				</div>
+			}
+		</div>
+	</li>
+}

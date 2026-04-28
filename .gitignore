@@ -15,3 +15,6 @@
 static/favicon*.png
 static/favicon.ico
 static/apple-touch-icon.png
+
+# generated templ output (regenerate with: templ generate ./internal/ui/...)
+*_templ.go

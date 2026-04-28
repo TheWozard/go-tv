@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"embed"
 	"flag"
+	"io/fs"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,6 +18,9 @@ import (
 	"go-tv/internal/channel"
 	"go-tv/internal/config"
 )
+
+//go:embed static
+var staticFiles embed.FS
 
 func main() {
 	configPath := flag.String("config", "./config.yaml", "path to config file")
@@ -37,6 +43,12 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 	api.OpenChannel(r, schedule, currentState)
+
+	sub, err := fs.Sub(staticFiles, "static")
+	if err != nil {
+		log.Fatalf("failed to prepare static FS: %v", err)
+	}
+	r.Handle("/*", http.FileServer(http.FS(sub)))
 
 	if err = cfg.GetServerListener().Listen(ctx, r); err != nil {
 		log.Fatal(err)
