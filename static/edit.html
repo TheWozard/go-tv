@@ -548,7 +548,6 @@
           <div class="sb-body text-muted">Loading…</div>
           <div class="sb-footer" style="display:none">
             <button class="sb-apply-btn">Apply selected</button>
-            <button class="sb-clear-btn">Clear segments</button>
           </div>
         </div>
         <div class="pos-wrap" style="display:none">
@@ -605,7 +604,7 @@
         row.className = 'sb-seg-row';
         const c = sbCatColors[seg.category] || { bg: '#33333322', fg: '#888' };
         row.innerHTML = `
-          <input type="checkbox" class="sb-check" data-idx="${seg.index}" checked>
+          <input type="checkbox" class="sb-check" data-idx="${seg.index}">
           <span class="sb-cat" style="background:${c.bg};color:${c.fg}">${escHtml(seg.category)}</span>
           <span class="sb-time">${fmt(seg.start_seconds)} → ${fmt(seg.end_seconds)}</span>
           <span class="sb-votes">${seg.votes > 0 ? '+' : ''}${seg.votes}</span>`;
@@ -658,18 +657,6 @@
         sbClose();
       } catch {
         sbBody.textContent = 'Failed to apply segments.';
-        sbBody.className = 'sb-body text-muted';
-      }
-    });
-
-    li.querySelector('.sb-clear-btn').addEventListener('click', async () => {
-      try {
-        const newSegs = await applySBCuts(v.id, []);
-        const vid = findVideoById(v.id);
-        if (vid) { vid.segments = newSegs; renderSegsBar(li, vid); }
-        sbClose();
-      } catch {
-        sbBody.textContent = 'Failed to clear segments.';
         sbBody.className = 'sb-body text-muted';
       }
     });
