@@ -63,18 +63,18 @@ func TestVideo_Current_WithSegments(t *testing.T) {
 	assert.Equal(t, time.Duration(0), frag.Start)
 	assert.Equal(t, 2*time.Minute, frag.End)
 
-	// Position past first segment still returns it
+	// Position inside second segment returns second segment
 	frag, ok = v.Current(6 * time.Minute)
 	assert.True(t, ok)
-	assert.Equal(t, time.Duration(0), frag.Start)
+	assert.Equal(t, 5*time.Minute, frag.Start)
 }
 
 func TestVideo_Current_PastAllSegments(t *testing.T) {
 	v := testVideo(
 		Segment{Start: dur(5 * time.Minute), End: dur(8 * time.Minute)},
 	)
-	_, ok := v.Current(sec(30))
-	assert.False(t, ok, "position before all segment starts returns false")
+	_, ok := v.Current(9 * time.Minute)
+	assert.False(t, ok, "position past all segment ends returns false")
 }
 
 // Video.Next
@@ -99,9 +99,9 @@ func TestVideo_Next_WithSegments(t *testing.T) {
 
 	frag, ok := v.Next(0)
 	assert.True(t, ok)
-	assert.Equal(t, 5*time.Minute, frag.Start)
+	assert.Equal(t, time.Duration(0), frag.Start)
 
-	// Before second segment still returns it
+	// After start of first segment returns second segment
 	frag, ok = v.Next(sec(30))
 	assert.True(t, ok)
 	assert.Equal(t, 5*time.Minute, frag.Start)

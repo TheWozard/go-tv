@@ -16,11 +16,12 @@ type Video struct {
 func (v Video) Current(position time.Duration) (Fragment, bool) {
 	if len(v.Segments) > 0 {
 		for _, seg := range v.Segments {
-			if seg.StartDuration() < position {
+			end := seg.EndDuration(v.Length.Duration)
+			if end >= position {
 				return Fragment{
 					Source: v.Source,
 					Start:  seg.StartDuration(),
-					End:    seg.EndDuration(v.Length.Duration),
+					End:    end,
 				}, true
 			}
 		}
@@ -41,7 +42,7 @@ func (v Video) Current(position time.Duration) (Fragment, bool) {
 func (v Video) Next(position time.Duration) (Fragment, bool) {
 	if len(v.Segments) > 0 {
 		for _, seg := range v.Segments {
-			if seg.StartDuration() > position {
+			if seg.StartDuration() >= position {
 				return Fragment{
 					Source: v.Source,
 					Start:  seg.StartDuration(),

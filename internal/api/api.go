@@ -94,21 +94,16 @@ func writeJSON(w http.ResponseWriter, v any, code int) {
 }
 
 func (s *Channel) currentState() (stateResponse, bool) {
-	videoID, pos := s.State.Get()
-	video, ok := s.Schedule.Find(videoID)
-	if !ok {
-		return stateResponse{}, false
-	}
-	frag, hasFrag := video.Current(pos)
-	stopSecs := 0.0
-	if hasFrag {
-		stopSecs = frag.End.Seconds()
+	source, position := s.State.Get()
+	frag, ok := s.Schedule.Current(source, position)
+	if frag.Source.Equal(source) {
+		frag.Start = position
 	}
 	return stateResponse{
-		VideoID:     video.Source.ID,
-		Seconds:     pos.Seconds(),
-		StopSeconds: stopSecs,
-	}, true
+		VideoID:     frag.Source.ID,
+		Seconds:     frag.Start.Seconds(),
+		StopSeconds: frag.End.Seconds(),
+	}, ok
 }
 
 func videoToWire(v channel.Video) scheduleVideo {
