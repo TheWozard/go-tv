@@ -76,7 +76,7 @@ func (s *State) SetPosition(source Source, position time.Duration) {
 	if !s.Source.Equal(source) {
 		return
 	}
-	s.Position.Duration = position
+	s.Position.Duration = position.Round(time.Second)
 }
 
 // Jump unconditionally moves playback to a new source and position.
@@ -84,7 +84,7 @@ func (s *State) Jump(source Source, position time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.Source = source
-	s.Position.Duration = position
+	s.Position.Duration = position.Round(time.Second)
 }
 
 // Advance transitions to the next fragment. The transition is ignored if
