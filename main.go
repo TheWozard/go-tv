@@ -43,7 +43,7 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 	ch := channel.NewChannel(schedule, currentState)
-	api.OpenChannel(r, ch)
+	api.OpenChannel(r, ch, cfg.Player)
 
 	sub, err := fs.Sub(staticFiles, "static")
 	if err != nil {

@@ -9,16 +9,18 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"go-tv/internal/channel"
+	"go-tv/internal/config"
 	"go-tv/internal/ui/components"
 )
 
-func OpenChannel(r chi.Router, ch *channel.Channel) {
-	s := &Server{channel: ch}
+func OpenChannel(r chi.Router, ch *channel.Channel, player config.Player) {
+	s := &Server{channel: ch, player: player}
 	s.Route(r)
 }
 
 type Server struct {
 	channel *channel.Channel
+	player  config.Player
 }
 
 func (s *Server) Route(r chi.Router) {
@@ -37,7 +39,7 @@ func (s *Server) Route(r chi.Router) {
 func (s *Server) playerHandler(w http.ResponseWriter, r *http.Request) {
 	source, position, stopAt, _ := s.channel.CurrentState()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	components.Player(source, position, stopAt).Render(r.Context(), w)
+	components.Player(source, position, stopAt, s.player).Render(r.Context(), w)
 }
 
 func (s *Server) editHandler(w http.ResponseWriter, r *http.Request) {

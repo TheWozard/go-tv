@@ -1,55 +1,53 @@
-import { throttle } from 'lodash-es';
+import { postProgress, postNext } from './player/api.js';
+import { initControls } from './player/controls.js';
 
-let player;
-let resolveYtReady;
-const ytReady = new Promise(resolve => { resolveYtReady = resolve; });
+// state is shared with controls.js by reference so mutations here are visible there.
+const state = {
+  player: null,       // YouTube IFrame player instance, set in startHere()
+  currentSource: null, // { kind, id } of the loaded video
+  currentStop: 0,     // server-imposed stop time in seconds (0 = no stop)
+};
 
-let currentSource = null; // { kind, id }
-let currentStop = 0;
-
-const TICK_MS = 1000;
-
-// ---- API calls ----
-
-const postProgress = throttle((source, seconds) => {
-  fetch('/api/progress', {
-    method: 'POST',
-    body: new URLSearchParams({ source_kind: source.kind, source_id: source.id, seconds }),
-  }).catch(() => {});
-}, 5_000);
-
-const postNext = throttle(async (source, seconds) => {
-  await htmx.ajax('POST', '/api/next', {
-    target: '#player-state',
-    swap: 'outerHTML',
-    values: { source_kind: source.kind, source_id: source.id, seconds: String(seconds) },
-  });
-}, 30_000, { leading: true, trailing: false });
+// ytReady resolves when the YouTube IFrame API fires onYouTubeIframeAPIReady.
+// startHere() awaits it before constructing the player.
+const { promise: ytReady, resolve: ytApiLoaded } = Promise.withResolvers();
 
 // ---- Playback control ----
 
-function advance() {
-  const seconds = (player && typeof player.getCurrentTime === 'function')
-    ? player.getCurrentTime() : 0;
-  postNext(currentSource, seconds);
+// playingTime returns the current playback position in seconds, or null if the
+// player is absent or not currently playing.
+function playingTime() {
+  if (!state.player || typeof state.player.getCurrentTime !== 'function') return null;
+  if (state.player.getPlayerState() !== YT.PlayerState.PLAYING) return null;
+  return state.player.getCurrentTime();
 }
 
+// advance moves to the next video, reporting the current position first.
+function advance() {
+  const seconds = (state.player && typeof state.player.getCurrentTime === 'function')
+    ? state.player.getCurrentTime() : 0;
+  postNext(state.currentSource, seconds);
+}
+
+// applyState syncs the player to server state. If the source hasn't changed
+// it only seeks when positions are more than 5s apart (avoids seek loops).
 function applyState(sourceKind, sourceId, seconds, stopSeconds) {
-  currentStop = stopSeconds;
-  if (currentSource?.kind === sourceKind && currentSource?.id === sourceId) {
-    if (player && Math.abs(player.getCurrentTime() - seconds) > 5) {
-      player.seekTo(seconds, true);
+  state.currentStop = stopSeconds;
+  if (state.currentSource?.kind === sourceKind && state.currentSource?.id === sourceId) {
+    if (state.player && Math.abs(state.player.getCurrentTime() - seconds) > 5) {
+      state.player.seekTo(seconds, true);
     }
     return;
   }
-  currentSource = { kind: sourceKind, id: sourceId };
-  if (sourceKind === 'youtube' && player) {
-    player.loadVideoById({ videoId: sourceId, startSeconds: Math.floor(seconds) });
+  state.currentSource = { kind: sourceKind, id: sourceId };
+  if (sourceKind === 'youtube' && state.player) {
+    state.player.loadVideoById({ videoId: sourceId, startSeconds: Math.floor(seconds) });
   }
 }
 
 // ---- State observer ----
 
+// applyStateFromEl reads data-* attributes on #player-state and calls applyState.
 function applyStateFromEl(el) {
   applyState(
     el.dataset.sourceKind,
@@ -59,6 +57,7 @@ function applyStateFromEl(el) {
   );
 }
 
+// Re-sync whenever HTMX swaps in a new #player-state fragment.
 document.addEventListener('htmx:afterSwap', e => {
   if (e.detail.target?.id !== 'player-state') return;
   const el = document.getElementById('player-state');
@@ -69,49 +68,34 @@ document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('player-state');
   if (el) applyStateFromEl(el);
 
-  // ---- Overlay: cursor hide + click to pause/play ----
-  const overlay = document.getElementById('overlay');
-  let cursorTimer;
-  overlay.addEventListener('mousemove', () => {
-    overlay.style.cursor = 'default';
-    clearTimeout(cursorTimer);
-    cursorTimer = setTimeout(() => { overlay.style.cursor = 'none'; }, 3000);
-  });
-  function togglePlayPause() {
-    if (!player || typeof player.getPlayerState !== 'function') return;
-    if (player.getPlayerState() === YT.PlayerState.PLAYING) {
-      player.pauseVideo();
-    } else {
-      player.playVideo();
-    }
-  }
+  initControls(state, advance);
 
-  overlay.addEventListener('click', togglePlayPause);
-  document.addEventListener('keydown', e => {
-    if (e.code === 'Space' && e.target === document.body) {
-      e.preventDefault();
-      togglePlayPause();
-    }
-  });
+  const wrapper = document.getElementById('player-wrapper');
+
+  // Advance check: frequent so stop-time is caught promptly.
+  const advanceMs = parseInt(wrapper?.dataset.advanceRateMs, 10) || 1000;
+  setInterval(() => {
+    const t = playingTime();
+    if (t === null) return;
+    if (state.currentStop > 0 && t >= state.currentStop) advance();
+  }, advanceMs);
+
+  // Progress report: less frequent, just keeps the server in sync.
+  const progressMs = parseInt(wrapper?.dataset.progressRateMs, 10) || 10000;
+  setInterval(() => {
+    const t = playingTime();
+    if (t === null) return;
+    postProgress(state.currentSource, t);
+  }, progressMs);
 });
-
-// ---- Tick loop ----
-
-setInterval(() => {
-  if (!player || typeof player.getCurrentTime !== 'function') return;
-  if (player.getPlayerState() !== YT.PlayerState.PLAYING) return;
-
-  const t = player.getCurrentTime();
-  postProgress(currentSource, t);
-  if (currentStop > 0 && t >= currentStop) advance();
-}, TICK_MS);
 
 // ---- YouTube IFrame API bootstrap ----
 
-window.onYouTubeIframeAPIReady = function () {
-  resolveYtReady();
-};
+// Called by the YouTube IFrame API script once it has loaded.
+window.onYouTubeIframeAPIReady = ytApiLoaded;
 
+// startHere is called by the "Watch Here" button. It hides the start screen,
+// waits for the YT API, then constructs the player at the server-supplied position.
 window.startHere = async function () {
   document.getElementById('start-screen').style.display = 'none';
   document.getElementById('player-wrapper').style.display = 'block';
@@ -119,17 +103,12 @@ window.startHere = async function () {
   await ytReady;
 
   const el = document.getElementById('player-state');
-  const sourceKind = el?.dataset.sourceKind || '';
-  const sourceId = el?.dataset.sourceId || '';
-  const position = parseFloat(el?.dataset.position) || 0;
-  const stopAt = parseFloat(el?.dataset.stopAt) || 0;
+  state.currentSource = { kind: el?.dataset.sourceKind || '', id: el?.dataset.sourceId || '' };
+  state.currentStop = parseFloat(el?.dataset.stopAt) || 0;
 
-  currentSource = { kind: sourceKind, id: sourceId };
-  currentStop = stopAt;
-
-  player = new YT.Player('player', {
-    videoId: sourceId,
-    playerVars: { start: Math.floor(position), autoplay: 1, controls: 0 },
+  state.player = new YT.Player('player', {
+    videoId: state.currentSource.id,
+    playerVars: { start: Math.floor(parseFloat(el?.dataset.position) || 0), autoplay: 1, controls: 0 },
     events: {
       onStateChange(event) {
         if (event.data === YT.PlayerState.ENDED) advance();

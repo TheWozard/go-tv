@@ -6,15 +6,37 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
+
+// Duration is a time.Duration that unmarshals from YAML strings like "10s" or "1m30s".
+type Duration time.Duration
+
+func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
+	dur, err := time.ParseDuration(value.Value)
+	if err != nil {
+		return err
+	}
+	*d = Duration(dur)
+	return nil
+}
+
+func (d Duration) Duration() time.Duration { return time.Duration(d) }
+
+type Player struct {
+	SkipInterval Duration `yaml:"skip_interval"`
+	AdvanceRate  Duration `yaml:"advance_rate"`
+	ProgressRate Duration `yaml:"progress_rate"`
+}
 
 type Config struct {
 	SchedulePath string    `yaml:"schedule"`
 	StatePath    string    `yaml:"state"`
 	Tailscale    Tailscale `yaml:"tailscale"`
 	Server       Server    `yaml:"server"`
+	Player       Player    `yaml:"player"`
 }
 
 // Load reads a YAML config file and returns a Config with defaults applied.
@@ -29,6 +51,11 @@ func Load(path string) (*Config, error) {
 		},
 		Server: Server{
 			Port: "8080",
+		},
+		Player: Player{
+			SkipInterval: Duration(10 * time.Second),
+			AdvanceRate:  Duration(time.Second),
+			ProgressRate: Duration(10 * time.Second),
 		},
 	}
 

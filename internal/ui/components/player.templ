@@ -1,11 +1,13 @@
 package components
 
 import (
+	"fmt"
 	"go-tv/internal/channel"
+	"go-tv/internal/config"
 	"time"
 )
 
-templ Player(source channel.Source, position, stopAt time.Duration) {
+templ Player(source channel.Source, position, stopAt time.Duration, player config.Player) {
 	@Layout("go-tv", "player") {
 		<body>
 			@PlayerState(source, position, stopAt)
@@ -13,7 +15,12 @@ templ Player(source channel.Source, position, stopAt time.Duration) {
 				<button class="start-btn primary" onclick="startHere()">▶ Watch Here</button>
 				<a href="/edit">Edit</a>
 			</div>
-			<div id="player-wrapper">
+			<div
+				id="player-wrapper"
+				data-skip-interval-ms={ fmt.Sprintf("%d", player.SkipInterval.Duration().Milliseconds()) }
+				data-advance-rate-ms={ fmt.Sprintf("%d", player.AdvanceRate.Duration().Milliseconds()) }
+				data-progress-rate-ms={ fmt.Sprintf("%d", player.ProgressRate.Duration().Milliseconds()) }
+			>
 				<div id="player"></div>
 				<div id="overlay"></div>
 			</div>
