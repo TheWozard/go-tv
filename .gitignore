@@ -1,6 +1,9 @@
 # ai
 .claude
 
+# editor
+.vscode
+
 # binary
 /go-tv
 /append
