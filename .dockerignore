@@ -1,2 +1,24 @@
 .git
+.claude
+
+# runtime data
 state.json
+state.test.json
+schedule.json
+schedule.test.json
+*.yaml
+*.tar
+
+# compiled binary
+go-tv
+
+# JS dependencies (reinstalled by npm ci)
+node_modules/
+
+# generated files (regenerated during build)
+static/js/
+static/css/
+static/favicon*.png
+static/favicon.ico
+static/apple-touch-icon.png
+*_templ.go

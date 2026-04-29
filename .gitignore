@@ -7,6 +7,9 @@
 /sponsorblock
 /clean
 
+# export artifact
+*.tar
+
 # runtime data — not source-controlled
 /*.yaml
 /*.json
@@ -20,7 +23,8 @@ static/apple-touch-icon.png
 
 # JS dependencies and bundles (vendor with: just vendor-js)
 node_modules
-static/*.js
+static/js
+static/css
 
 # generated templ output (regenerate with: templ generate ./internal/ui/...)
 *_templ.go

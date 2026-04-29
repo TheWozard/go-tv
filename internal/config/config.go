@@ -11,10 +11,10 @@ import (
 )
 
 type Config struct {
-	SchedulePath string        `yaml:"schedule"`
-	StatePath    string        `yaml:"state"`
-	Tailscale    Tailscale     `yaml:"tailscale"`
-	Server       Server        `yaml:"server"`
+	SchedulePath string    `yaml:"schedule"`
+	StatePath    string    `yaml:"state"`
+	Tailscale    Tailscale `yaml:"tailscale"`
+	Server       Server    `yaml:"server"`
 }
 
 // Load reads a YAML config file and returns a Config with defaults applied.
@@ -24,7 +24,8 @@ func Load(path string) (*Config, error) {
 		SchedulePath: "schedule.json",
 		StatePath:    "state.json",
 		Tailscale: Tailscale{
-			Dir: "/var/lib/tailscale",
+			Dir:  "/var/lib/tailscale",
+			Port: "443",
 		},
 		Server: Server{
 			Port: "8080",
@@ -34,6 +35,7 @@ func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
+			cfg.ApplyEnvOverrides()
 			return cfg, nil
 		}
 		return nil, err

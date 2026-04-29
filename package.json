@@ -1,8 +1,8 @@
 {
   "private": true,
   "scripts": {
-    "build": "esbuild js/htmx.js js/player.js js/editor.js --bundle --platform=browser --format=iife --minify --outdir=static",
-    "watch": "esbuild js/htmx.js js/player.js js/editor.js --bundle --platform=browser --format=iife --outdir=static --watch"
+    "build": "esbuild js/htmx.js js/player.js js/editor.js css/player.css css/editor.css --bundle --platform=browser --format=iife --minify --outbase=. --outdir=static",
+    "watch": "esbuild js/htmx.js js/player.js js/editor.js css/player.css css/editor.css --bundle --platform=browser --format=iife --outbase=. --outdir=static --watch"
   },
   "dependencies": {
     "htmx.org": "^2.0.4",

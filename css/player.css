@@ -1,0 +1,78 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  background: #111;
+  overflow: hidden;
+}
+
+#start-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-family: system-ui, sans-serif;
+}
+
+.start-btn {
+  background: none;
+  border: 1px solid #444;
+  color: #888;
+  font-size: .9rem;
+  padding: 10px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color .2s, color .2s;
+  min-width: 160px;
+}
+
+.start-btn:hover {
+  border-color: #aaa;
+  color: #ddd;
+}
+
+.start-btn.primary {
+  border: 2px solid #444;
+  font-size: 1rem;
+  padding: 12px 28px;
+}
+
+#player-wrapper {
+  position: fixed;
+  inset: 0;
+  display: none;
+}
+
+#player-wrapper iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  cursor: none;
+}
+
+#start-screen a {
+  color: #555;
+  text-decoration: none;
+  font-size: .8rem;
+}
+
+#start-screen a:hover {
+  color: #aaa;
+}
