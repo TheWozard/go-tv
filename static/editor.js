@@ -22,7 +22,7 @@ function closeSB(videoId) {
 }
 
 // SortableJS drag-and-drop (loaded from CDN)
-document.addEventListener('DOMContentLoaded', () => {
+function initSortable() {
   if (typeof Sortable === 'undefined') return;
 
   Sortable.create(document.getElementById('video-list'), {
@@ -38,6 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
       onEnd: saveOrder,
     });
   });
+}
+
+document.addEventListener('DOMContentLoaded', initSortable);
+document.addEventListener('htmx:afterSwap', e => {
+  if (e.target.id === 'video-list') initSortable();
 });
 
 function saveOrder() {

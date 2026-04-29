@@ -20,12 +20,14 @@ type Server struct {
 }
 
 func (s *Server) Route(r chi.Router) {
-	htmx := &HTMXHandler{channel: s.channel}
+	player := &PlayerHandler{channel: s.channel}
+	editor := &EditorHandler{channel: s.channel}
 
 	r.Get("/", s.playerHandler)
 	r.Get("/edit", s.editHandler)
 	r.Route("/api", func(r chi.Router) {
-		htmx.Mount(r)
+		player.Mount(r)
+		editor.Mount(r)
 		r.Post("/schedule/reorder", s.scheduleReorderHandler)
 	})
 }

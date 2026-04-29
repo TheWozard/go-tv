@@ -33,7 +33,8 @@ templ VideoCard(v channel.Video, isActive bool, activeSeconds float64) {
 						class="play-btn"
 						title="jump to this video"
 						hx-post="/api/jump"
-						hx-swap="none"
+						hx-target="#video-list"
+						hx-swap="outerHTML"
 						hx-vals={ `{"video_id":"` + v.Source.ID + `","seconds":"0"}` }
 					>▶</button>
 				</span>

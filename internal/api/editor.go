@@ -13,23 +13,19 @@ import (
 	"go-tv/internal/ui/components"
 )
 
-// HTMXHandler serves all endpoints driven by HTMX attributes in the browser.
-// All handlers accept form-encoded requests and return HTML fragments.
-type HTMXHandler struct {
+// EditorHandler serves HTMX endpoints used by the editor page.
+type EditorHandler struct {
 	channel *channel.Channel
 }
 
-// Mount registers HTMX-driven routes on r, scoped to /api.
-func (h *HTMXHandler) Mount(r chi.Router) {
+func (h *EditorHandler) Mount(r chi.Router) {
 	r.Post("/jump", h.jumpHandler)
-	r.Post("/progress", h.progressHandler)
-	r.Post("/next", h.nextHandler)
 	r.Post("/schedule/rename", h.renameHandler)
 	r.Get("/sponsorblock/{videoID}", h.sbGetHandler)
 	r.Post("/sponsorblock/{videoID}", h.sbPostHandler)
 }
 
-func (h *HTMXHandler) jumpHandler(w http.ResponseWriter, r *http.Request) {
+func (h *EditorHandler) jumpHandler(w http.ResponseWriter, r *http.Request) {
 	videoID := r.FormValue("video_id")
 	seconds, _ := strconv.ParseFloat(r.FormValue("seconds"), 64)
 	if videoID == "" {
@@ -40,37 +36,12 @@ func (h *HTMXHandler) jumpHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (h *HTMXHandler) progressHandler(w http.ResponseWriter, r *http.Request) {
-	videoID := r.FormValue("video_id")
-	seconds, _ := strconv.ParseFloat(r.FormValue("seconds"), 64)
-	if videoID == "" {
-		http.Error(w, "invalid body", http.StatusBadRequest)
-		return
-	}
-	h.channel.Progress(videoID, seconds)
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (h *HTMXHandler) nextHandler(w http.ResponseWriter, r *http.Request) {
-	videoID := r.FormValue("video_id")
-	seconds, _ := strconv.ParseFloat(r.FormValue("seconds"), 64)
-	if videoID == "" {
-		http.Error(w, "invalid body", http.StatusBadRequest)
-		return
-	}
-	if err := h.channel.Next(videoID, seconds); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	newVideoID, newSeconds, newStop, _ := h.channel.CurrentState()
+	activeVideoID, activeSeconds, _, _ := h.channel.CurrentState()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	components.PlayerState(newVideoID, newSeconds, newStop).Render(r.Context(), w)
+	components.VideoList(h.channel.Playlists(), activeVideoID, activeSeconds).Render(r.Context(), w)
 }
 
-func (h *HTMXHandler) renameHandler(w http.ResponseWriter, r *http.Request) {
+func (h *EditorHandler) renameHandler(w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
 	oldName := r.FormValue("old_name")
 	if name == "" || oldName == "" {
@@ -84,7 +55,7 @@ func (h *HTMXHandler) renameHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *HTMXHandler) sbGetHandler(w http.ResponseWriter, r *http.Request) {
+func (h *EditorHandler) sbGetHandler(w http.ResponseWriter, r *http.Request) {
 	videoID := chi.URLParam(r, "videoID")
 	segs, err := sponsorblock.New().GetSegments(videoID, nil)
 	if err != nil {
@@ -104,7 +75,7 @@ func (h *HTMXHandler) sbGetHandler(w http.ResponseWriter, r *http.Request) {
 	components.SponsorBlockPanel(videoID, sbSegs).Render(r.Context(), w)
 }
 
-func (h *HTMXHandler) sbPostHandler(w http.ResponseWriter, r *http.Request) {
+func (h *EditorHandler) sbPostHandler(w http.ResponseWriter, r *http.Request) {
 	videoID := chi.URLParam(r, "videoID")
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "invalid form", http.StatusBadRequest)
