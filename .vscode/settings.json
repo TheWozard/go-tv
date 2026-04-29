@@ -1,0 +1,10 @@
+{
+    "files.exclude": {
+        "**/*_templ.go": true,
+        "node_modules": true,
+    },
+    "search.exclude": {
+        "**/*_templ.go": true,
+        "node_modules": true
+    }
+}

@@ -1,7 +1,8 @@
 {
   "private": true,
   "scripts": {
-    "build": "esbuild js/htmx.js js/player.js js/editor.js --bundle --platform=browser --format=iife --minify --outdir=static"
+    "build": "esbuild js/htmx.js js/player.js js/editor.js --bundle --platform=browser --format=iife --minify --outdir=static",
+    "watch": "esbuild js/htmx.js js/player.js js/editor.js --bundle --platform=browser --format=iife --outdir=static --watch"
   },
   "dependencies": {
     "htmx.org": "^2.0.4",
@@ -9,6 +10,6 @@
     "sortablejs": "^1.15.6"
   },
   "devDependencies": {
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.28.0"
   }
 }

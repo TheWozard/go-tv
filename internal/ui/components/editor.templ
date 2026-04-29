@@ -20,7 +20,7 @@ templ VideoList(sets []channel.Playlist, active channel.Source, activeAt time.Du
 }
 
 templ Editor(sets []channel.Playlist, active channel.Source, activeAt time.Duration) {
-	@Layout("go-tv / edit") {
+	@Layout("go-tv / edit", "editor") {
 		<body class="editor">
 			<header>
 				<h1>go-tv</h1>
@@ -29,7 +29,6 @@ templ Editor(sets []channel.Playlist, active channel.Source, activeAt time.Durat
 				</nav>
 			</header>
 			@VideoList(sets, active, activeAt)
-			<script src="/editor.js"></script>
 		</body>
 	}
 }

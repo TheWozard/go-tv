@@ -6,7 +6,7 @@ import (
 )
 
 templ Player(source channel.Source, position, stopAt time.Duration) {
-	@Layout("go-tv") {
+	@Layout("go-tv", "player") {
 		<body>
 			@PlayerState(source, position, stopAt)
 			<div id="start-screen">
@@ -17,7 +17,6 @@ templ Player(source channel.Source, position, stopAt time.Duration) {
 				<div id="player"></div>
 				<div id="overlay"></div>
 			</div>
-			<script src="/player.js"></script>
 			<script src="https://www.youtube.com/iframe_api" async></script>
 		</body>
 	}
