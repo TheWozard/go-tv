@@ -3,7 +3,6 @@ package components
 import "fmt"
 
 type SBSegment struct {
-	Index        int
 	Category     string
 	StartSeconds float64
 	EndSeconds   float64
@@ -35,17 +34,20 @@ templ SponsorBlockPanel(videoID string, segs []SBSegment) {
 		if len(segs) == 0 {
 			<p class="text-muted">No segments found.</p>
 		} else {
-			<ul class="sb-seg-list">
-				for _, seg := range segs {
-					@sbSegRow(seg)
-				}
-			</ul>
-			<div class="sb-footer">
-				<button
-					class="sb-apply-btn"
-					data-on:click={ "@post('/api/sponsorblock/" + videoID + "', {contentType: 'application/json'})" }
-				>Apply selected</button>
-			</div>
+			<form
+				hx-post={ "/api/sponsorblock/" + videoID }
+				hx-target="closest .card"
+				hx-swap="outerHTML"
+			>
+				<ul class="sb-seg-list">
+					for _, seg := range segs {
+						@sbSegRow(seg)
+					}
+				</ul>
+				<div class="sb-footer">
+					<button type="submit" class="sb-apply-btn">Apply selected</button>
+				</div>
+			</form>
 		}
 	</div>
 }
@@ -54,24 +56,20 @@ templ sbSegRow(seg SBSegment) {
 	{{ colors, ok := sbCatColors[seg.Category]; if !ok { colors = [2]string{"#33333322", "#888"} } }}
 	<li
 		class="sb-seg-row"
-		data-idx={ fmt.Sprintf("%d", seg.Index) }
-		onclick="toggleSBCheck(parseInt(this.dataset.idx), this)"
+		onclick="this.querySelector('.sb-check').click()"
 	>
 		<input
 			type="checkbox"
 			class="sb-check"
-			data-idx={ fmt.Sprintf("%d", seg.Index) }
+			name="cuts"
+			value={ fmt.Sprintf("%g,%g", seg.StartSeconds, seg.EndSeconds) }
 			onmousedown="event.stopPropagation()"
 		/>
 		<span
 			class="sb-cat"
 			style={ fmt.Sprintf("background:%s;color:%s", colors[0], colors[1]) }
 		>{ seg.Category }</span>
-		<span
-			class="sb-time"
-			data-start={ fmt.Sprintf("%g", seg.StartSeconds) }
-			data-end={ fmt.Sprintf("%g", seg.EndSeconds) }
-		>{ fmtSecs(seg.StartSeconds) } → { fmtSecs(seg.EndSeconds) }</span>
+		<span class="sb-time">{ fmtSecs(seg.StartSeconds) } → { fmtSecs(seg.EndSeconds) }</span>
 		<span class="sb-votes">
 			if seg.Votes > 0 {
 				+

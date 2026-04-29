@@ -19,7 +19,6 @@ static/favicon.ico
 static/apple-touch-icon.png
 
 # JS dependencies (vendor with: just vendor-js)
-node_modules/
 static/vendor
 
 # generated templ output (regenerate with: templ generate ./internal/ui/...)

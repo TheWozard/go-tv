@@ -1,7 +1,7 @@
 /**
  * go-tv player bridge
  *
- * Connects the YouTube IFrame API to the Datastar SSE state stream.
+ * Connects the YouTube IFrame API to the SSE state stream.
  * State is pushed from the server as a #player-state fragment with
  * data-video-id, data-seconds, and data-stop-seconds attributes.
  * A MutationObserver watches for attribute changes and drives the player.
@@ -23,18 +23,27 @@ let advancing = false;
 async function postProgress(videoId, seconds) {
   await fetch('/api/progress', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ video_id: videoId, seconds }),
+    body: new URLSearchParams({ video_id: videoId, seconds }),
   });
 }
 
 async function postNext(videoId, seconds) {
   const res = await fetch('/api/next', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ video_id: videoId, seconds }),
+    body: new URLSearchParams({ video_id: videoId, seconds }),
   });
   if (!res.ok) throw new Error('failed to advance');
+  // Parse the returned #player-state fragment and update attributes in-place
+  // so the MutationObserver fires applyState without breaking observation.
+  const tmp = document.createElement('div');
+  tmp.innerHTML = await res.text();
+  const next = tmp.querySelector('#player-state');
+  if (!next) return;
+  const el = document.getElementById('player-state');
+  if (!el) return;
+  el.dataset.videoId = next.dataset.videoId;
+  el.dataset.seconds = next.dataset.seconds;
+  el.dataset.stopSeconds = next.dataset.stopSeconds;
 }
 
 // ---- Playback control ----
@@ -46,7 +55,6 @@ async function advance() {
     const seconds = (player && typeof player.getCurrentTime === 'function')
       ? player.getCurrentTime() : 0;
     await postNext(currentVideoId, seconds);
-    // State update arrives via SSE -> MutationObserver -> applyState
   } catch {
     player?.pauseVideo();
   } finally {
@@ -70,7 +78,7 @@ function applyState(videoId, seconds, stopSeconds) {
 
 // ---- SSE state observer ----
 
-// Watch #player-state for attribute changes pushed by Datastar
+// Watch #player-state for attribute changes
 const stateObserver = new MutationObserver(() => {
   const el = document.getElementById('player-state');
   if (!el) return;
@@ -92,6 +100,31 @@ document.addEventListener('DOMContentLoaded', () => {
       parseFloat(el.dataset.stopSeconds) || 0,
     );
   }
+
+  // ---- Overlay: cursor hide + click to pause/play ----
+  const overlay = document.getElementById('overlay');
+  let cursorTimer;
+  overlay.addEventListener('mousemove', () => {
+    overlay.style.cursor = 'default';
+    clearTimeout(cursorTimer);
+    cursorTimer = setTimeout(() => { overlay.style.cursor = 'none'; }, 3000);
+  });
+  function togglePlayPause() {
+    if (!player || typeof player.getPlayerState !== 'function') return;
+    if (player.getPlayerState() === YT.PlayerState.PLAYING) {
+      player.pauseVideo();
+    } else {
+      player.playVideo();
+    }
+  }
+
+  overlay.addEventListener('click', togglePlayPause);
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space' && e.target === document.body) {
+      e.preventDefault();
+      togglePlayPause();
+    }
+  });
 });
 
 // ---- Tick loop ----
@@ -107,29 +140,6 @@ setInterval(() => {
   }
   if (currentStop > 0 && t >= currentStop) advance();
 }, TICK_MS);
-
-// ---- Edit link show/hide ----
-
-const editLink = document.getElementById('edit-link');
-let hideTimer;
-let catchOverlay = null;
-
-function showEdit() {
-  if (catchOverlay) { catchOverlay.remove(); catchOverlay = null; }
-  editLink.classList.add('visible');
-  clearTimeout(hideTimer);
-  hideTimer = setTimeout(hideEdit, 3000);
-}
-
-function hideEdit() {
-  editLink.classList.remove('visible');
-  catchOverlay = document.createElement('div');
-  catchOverlay.style.cssText = 'position:fixed;inset:0;z-index:9;';
-  catchOverlay.addEventListener('mousemove', showEdit, { once: true });
-  document.body.appendChild(catchOverlay);
-}
-
-document.addEventListener('mousemove', showEdit);
 
 // ---- YouTube IFrame API bootstrap ----
 
@@ -153,7 +163,7 @@ window.startHere = async function () {
 
   player = new YT.Player('player', {
     videoId,
-    playerVars: { start: Math.floor(seconds), autoplay: 1 },
+    playerVars: { start: Math.floor(seconds), autoplay: 1, controls: 0 },
     events: {
       onStateChange(event) {
         if (event.data === YT.PlayerState.ENDED) advance();

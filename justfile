@@ -6,10 +6,10 @@ tar    := "go-tv.tar"
 icons:
     ./scripts/gen-favicon.sh
 
-# Install JS dependencies and copy bundles to static/
+# Download JS dependencies to static/vendor/
 vendor-js:
-    npm install
-    cp node_modules/@starfederation/datastar/dist/datastar.js static/vendor/datastar.js
+    mkdir -p static/vendor
+    curl -fsSL https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js -o static/vendor/htmx.js
 
 # Generate templ components
 generate:

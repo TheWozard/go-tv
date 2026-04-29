@@ -32,7 +32,9 @@ templ VideoCard(v channel.Video, isActive bool, activeSeconds float64) {
 					<button
 						class="play-btn"
 						title="jump to this video"
-						onclick="jumpTo(this.closest('.card').dataset.id, 0)"
+						hx-post="/api/jump"
+						hx-swap="none"
+						hx-vals={ `{"video_id":"` + v.Source.ID + `","seconds":"0"}` }
 					>▶</button>
 				</span>
 			</div>
@@ -53,7 +55,9 @@ templ VideoCard(v channel.Video, isActive bool, activeSeconds float64) {
 				<button
 					class="sb-btn"
 					title="check SponsorBlock segments"
-					data-on:click={ "@get('/api/sponsorblock/" + v.Source.ID + "')" }
+					hx-get={ "/api/sponsorblock/" + v.Source.ID }
+				hx-target={ "#sb-panel-" + v.Source.ID }
+				hx-swap="outerHTML"
 				>SB</button>
 			</div>
 			<div id={ "sb-panel-" + v.Source.ID }></div>
@@ -71,8 +75,12 @@ templ VideoCard(v channel.Video, isActive bool, activeSeconds float64) {
 							max={ fmt.Sprintf("%g", maxSecs) }
 							step="1"
 							value={ fmt.Sprintf("%g", activeSeconds) }
+							name="seconds"
+							hx-post="/api/jump"
+							hx-trigger="change"
+							hx-swap="none"
+							hx-vals={ `{"video_id":"` + v.Source.ID + `"}` }
 							oninput="updatePosFill(this)"
-							onchange="jumpTo(this.closest('.card').dataset.id, this.value)"
 							onmousedown="event.stopPropagation()"
 						/>
 					</div>

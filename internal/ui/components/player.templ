@@ -3,15 +3,15 @@ package components
 templ Player(videoID string, seconds, stopSeconds float64) {
 	@Layout("go-tv") {
 		<body>
-			<div data-on:load="@get('/sse/state')"></div>
 			@PlayerState(videoID, seconds, stopSeconds)
 			<div id="start-screen">
 				<button class="start-btn primary" onclick="startHere()">▶ Watch Here</button>
+				<a href="/edit">Edit</a>
 			</div>
 			<div id="player-wrapper">
 				<div id="player"></div>
+				<div id="overlay"></div>
 			</div>
-			<a id="edit-link" href="/edit">Edit</a>
 			<script src="/player.js"></script>
 			<script src="https://www.youtube.com/iframe_api" async></script>
 		</body>

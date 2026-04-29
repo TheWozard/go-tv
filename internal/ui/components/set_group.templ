@@ -11,11 +11,16 @@ templ SetGroup(set channel.Playlist, activeVideoID string, activeSeconds float64
 			<input
 				class="set-name-input"
 				type="text"
+				name="name"
 				value={ set.Name }
-				data-old-name={ set.Name }
+				hx-post="/api/schedule/rename"
+				hx-trigger="input changed delay:800ms"
+				hx-include="next [name='old_name']"
+				hx-swap="none"
+				hx-on::after-request="if(event.detail.successful) this.nextElementSibling.value=this.value"
 				onmousedown="event.stopPropagation()"
-				oninput="debounceRename(this)"
 			/>
+			<input type="hidden" name="old_name" value={ set.Name }/>
 		</div>
 		<ul class="set-videos" id={ "set-videos-" + set.Name }>
 			for _, v := range set.Videos {
