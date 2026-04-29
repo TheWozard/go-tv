@@ -1,9 +1,14 @@
 package components
 
-templ Player(videoID string, seconds, stopSeconds float64) {
+import (
+	"go-tv/internal/channel"
+	"time"
+)
+
+templ Player(source channel.Source, position, stopAt time.Duration) {
 	@Layout("go-tv") {
 		<body>
-			@PlayerState(videoID, seconds, stopSeconds)
+			@PlayerState(source, position, stopAt)
 			<div id="start-screen">
 				<button class="start-btn primary" onclick="startHere()">▶ Watch Here</button>
 				<a href="/edit">Edit</a>

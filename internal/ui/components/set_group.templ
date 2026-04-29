@@ -1,9 +1,12 @@
 package components
 
-import "go-tv/internal/channel"
+import (
+	"go-tv/internal/channel"
+	"time"
+)
 
-templ SetGroup(set channel.Playlist, activeVideoID string, activeSeconds float64) {
-	{{ isActiveSet := false; for _, v := range set.Videos { if v.Source.ID == activeVideoID { isActiveSet = true; break } } }}
+templ SetGroup(set channel.Playlist, active channel.Source, activeAt time.Duration) {
+	{{ isActiveSet := false; for _, v := range set.Videos { if v.Source.Equal(active) { isActiveSet = true; break } } }}
 	<li class={ "set-item collapsed", templ.KV("active-set", isActiveSet) }>
 		<div class="set-header">
 			<div class="handle text-faint" title="drag to reorder">⠿</div>
@@ -24,7 +27,7 @@ templ SetGroup(set channel.Playlist, activeVideoID string, activeSeconds float64
 		</div>
 		<ul class="set-videos" id={ "set-videos-" + set.Name }>
 			for _, v := range set.Videos {
-				@VideoCard(v, v.Source.ID == activeVideoID, activeSeconds)
+				@VideoCard(v, v.Source.Equal(active), activeAt)
 			}
 		</ul>
 	</li>

@@ -1,8 +1,11 @@
 package components
 
-import "go-tv/internal/channel"
+import (
+	"go-tv/internal/channel"
+	"time"
+)
 
-templ VideoList(sets []channel.Playlist, activeVideoID string, activeSeconds float64) {
+templ VideoList(sets []channel.Playlist, active channel.Source, activeAt time.Duration) {
 	if len(sets) == 0 {
 		<ul id="video-list">
 			<li id="status" class="text-muted">No items in schedule.</li>
@@ -10,13 +13,13 @@ templ VideoList(sets []channel.Playlist, activeVideoID string, activeSeconds flo
 	} else {
 		<ul id="video-list">
 			for _, set := range sets {
-				@SetGroup(set, activeVideoID, activeSeconds)
+				@SetGroup(set, active, activeAt)
 			}
 		</ul>
 	}
 }
 
-templ Editor(sets []channel.Playlist, activeVideoID string, activeSeconds float64) {
+templ Editor(sets []channel.Playlist, active channel.Source, activeAt time.Duration) {
 	@Layout("go-tv / edit") {
 		<body class="editor">
 			<header>
@@ -25,8 +28,7 @@ templ Editor(sets []channel.Playlist, activeVideoID string, activeSeconds float6
 					<a href="/">Resume</a>
 				</nav>
 			</header>
-			@VideoList(sets, activeVideoID, activeSeconds)
-			<script src="https://cdn.jsdelivr.net/npm/sortablejs@1/Sortable.min.js"></script>
+			@VideoList(sets, active, activeAt)
 			<script src="/editor.js"></script>
 		</body>
 	}

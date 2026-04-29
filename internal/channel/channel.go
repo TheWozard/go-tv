@@ -17,14 +17,14 @@ func NewChannel(schedule *Schedule, state *State) *Channel {
 	return &Channel{schedule: schedule, state: state}
 }
 
-// CurrentState returns the active video ID, position, and stop point as scalars.
-func (c *Channel) CurrentState() (videoID string, seconds, stopSeconds float64, ok bool) {
-	source, position := c.state.Get()
-	frag, ok := c.schedule.Current(source, position)
-	if frag.Source.Equal(source) {
-		frag.Start = position
+// CurrentState returns the active source, playback position, and stop point.
+func (c *Channel) CurrentState() (source Source, position, stopAt time.Duration, ok bool) {
+	src, pos := c.state.Get()
+	frag, ok := c.schedule.Current(src, pos)
+	if frag.Source.Equal(src) {
+		frag.Start = pos
 	}
-	return frag.Source.ID, frag.Start.Seconds(), frag.End.Seconds(), ok
+	return frag.Source, frag.Start, frag.End, ok
 }
 
 // Playlists returns all playlists in the schedule.
@@ -32,28 +32,27 @@ func (c *Channel) Playlists() []Playlist {
 	return c.schedule.AllItems()
 }
 
-// Progress records playback position. Ignored if videoID is stale.
-func (c *Channel) Progress(videoID string, seconds float64) {
-	c.state.SetPosition(NewYoutubeSource(videoID), secs(seconds))
+// Progress records playback position. Ignored if source is stale.
+func (c *Channel) Progress(source Source, position time.Duration) {
+	c.state.SetPosition(source, position)
 }
 
-// Jump unconditionally moves playback to videoID at seconds.
-func (c *Channel) Jump(videoID string, seconds float64) error {
-	if _, ok := c.schedule.Find(NewYoutubeSource(videoID)); !ok {
+// Jump unconditionally moves playback to source at position.
+func (c *Channel) Jump(source Source, position time.Duration) error {
+	if _, ok := c.schedule.Find(source); !ok {
 		return errors.New("video not in schedule")
 	}
-	c.state.Jump(NewYoutubeSource(videoID), secs(seconds))
+	c.state.Jump(source, position)
 	return nil
 }
 
-// Next advances playback past videoID to the next fragment.
-func (c *Channel) Next(videoID string, seconds float64) error {
-	src := NewYoutubeSource(videoID)
-	frag, ok := c.schedule.Next(src, secs(seconds))
+// Next advances playback past source to the next fragment.
+func (c *Channel) Next(source Source, position time.Duration) error {
+	frag, ok := c.schedule.Next(source, position)
 	if !ok {
 		return errors.New("no next fragment")
 	}
-	c.state.Advance(src, frag.Source, frag.Start)
+	c.state.Advance(source, frag.Source, frag.Start)
 	return nil
 }
 
@@ -176,6 +175,3 @@ func makeSeg(start, end time.Duration) Segment {
 	return seg
 }
 
-func secs(s float64) time.Duration {
-	return time.Duration(s * float64(time.Second)).Truncate(time.Second)
-}

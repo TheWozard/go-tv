@@ -1,5 +1,7 @@
+import Sortable from 'sortablejs';
+
 // Position slider visual feedback
-function updatePosFill(input) {
+window.updatePosFill = function updatePosFill(input) {
   const wrap = input.closest('.pos-slider-wrap');
   const fill = wrap.querySelector('.pos-fill');
   const max = parseFloat(input.max) || 1;
@@ -14,17 +16,15 @@ function fmt(secs) {
 }
 
 // SponsorBlock panel toggle
-function closeSB(videoId) {
+window.closeSB = function closeSB(videoId) {
   const panel = document.getElementById('sb-panel-' + videoId);
   if (panel) panel.innerHTML = '';
   const card = document.querySelector(`.card[data-id="${CSS.escape(videoId)}"]`);
   if (card) card.querySelector('.sb-btn')?.classList.remove('open');
 }
 
-// SortableJS drag-and-drop (loaded from CDN)
+// SortableJS drag-and-drop
 function initSortable() {
-  if (typeof Sortable === 'undefined') return;
-
   Sortable.create(document.getElementById('video-list'), {
     handle: '.set-item > .set-header > .handle',
     animation: 150,

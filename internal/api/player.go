@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -21,28 +20,26 @@ func (h *PlayerHandler) Mount(r chi.Router) {
 }
 
 func (h *PlayerHandler) progressHandler(w http.ResponseWriter, r *http.Request) {
-	videoID := r.FormValue("video_id")
-	seconds, _ := strconv.ParseFloat(r.FormValue("seconds"), 64)
-	if videoID == "" {
-		http.Error(w, "invalid body", http.StatusBadRequest)
+	source, ok := sourceFromForm(r)
+	if !ok {
+		http.Error(w, "invalid source", http.StatusBadRequest)
 		return
 	}
-	h.channel.Progress(videoID, seconds)
+	h.channel.Progress(source, parseDuration(r, "seconds"))
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *PlayerHandler) nextHandler(w http.ResponseWriter, r *http.Request) {
-	videoID := r.FormValue("video_id")
-	seconds, _ := strconv.ParseFloat(r.FormValue("seconds"), 64)
-	if videoID == "" {
-		http.Error(w, "invalid body", http.StatusBadRequest)
+	source, ok := sourceFromForm(r)
+	if !ok {
+		http.Error(w, "invalid source", http.StatusBadRequest)
 		return
 	}
-	if err := h.channel.Next(videoID, seconds); err != nil {
+	if err := h.channel.Next(source, parseDuration(r, "seconds")); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	newVideoID, newSeconds, newStop, _ := h.channel.CurrentState()
+	newSource, newPosition, newStop, _ := h.channel.CurrentState()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	components.PlayerState(newVideoID, newSeconds, newStop).Render(r.Context(), w)
+	components.PlayerState(newSource, newPosition, newStop).Render(r.Context(), w)
 }

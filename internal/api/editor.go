@@ -26,19 +26,18 @@ func (h *EditorHandler) Mount(r chi.Router) {
 }
 
 func (h *EditorHandler) jumpHandler(w http.ResponseWriter, r *http.Request) {
-	videoID := r.FormValue("video_id")
-	seconds, _ := strconv.ParseFloat(r.FormValue("seconds"), 64)
-	if videoID == "" {
-		http.Error(w, "invalid body", http.StatusBadRequest)
+	source, ok := sourceFromForm(r)
+	if !ok {
+		http.Error(w, "invalid source", http.StatusBadRequest)
 		return
 	}
-	if err := h.channel.Jump(videoID, seconds); err != nil {
+	if err := h.channel.Jump(source, parseDuration(r, "seconds")); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	activeVideoID, activeSeconds, _, _ := h.channel.CurrentState()
+	activeSource, activeAt, _, _ := h.channel.CurrentState()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	components.VideoList(h.channel.Playlists(), activeVideoID, activeSeconds).Render(r.Context(), w)
+	components.VideoList(h.channel.Playlists(), activeSource, activeAt).Render(r.Context(), w)
 }
 
 func (h *EditorHandler) renameHandler(w http.ResponseWriter, r *http.Request) {

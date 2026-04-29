@@ -6,10 +6,10 @@ tar    := "go-tv.tar"
 icons:
     ./scripts/gen-favicon.sh
 
-# Download JS dependencies to static/vendor/
+# Install JS dependencies and bundle app JS
 vendor-js:
-    mkdir -p static/vendor
-    curl -fsSL https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js -o static/vendor/htmx.js
+    npm install
+    npm run build
 
 # Generate templ components
 generate:

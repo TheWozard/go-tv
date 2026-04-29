@@ -1,14 +1,19 @@
 package components
 
-import "fmt"
+import (
+	"fmt"
+	"go-tv/internal/channel"
+	"time"
+)
 
-// PlayerState is the SSE-pushed fragment that carries current playback state.
+// PlayerState is the fragment that carries current playback state.
 // The YouTube bridge in player.js reads these data-* attributes via MutationObserver.
-templ PlayerState(videoID string, seconds, stopSeconds float64) {
+templ PlayerState(source channel.Source, position, stopAt time.Duration) {
 	<div
 		id="player-state"
-		data-video-id={ videoID }
-		data-seconds={ fmt.Sprintf("%g", seconds) }
-		data-stop-seconds={ fmt.Sprintf("%g", stopSeconds) }
+		data-source-kind={ string(source.Kind) }
+		data-source-id={ source.ID }
+		data-position={ fmt.Sprintf("%g", position.Seconds()) }
+		data-stop-at={ fmt.Sprintf("%g", stopAt.Seconds()) }
 	></div>
 }

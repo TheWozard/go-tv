@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -33,15 +35,15 @@ func (s *Server) Route(r chi.Router) {
 }
 
 func (s *Server) playerHandler(w http.ResponseWriter, r *http.Request) {
-	videoID, seconds, stopSeconds, _ := s.channel.CurrentState()
+	source, position, stopAt, _ := s.channel.CurrentState()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	components.Player(videoID, seconds, stopSeconds).Render(r.Context(), w)
+	components.Player(source, position, stopAt).Render(r.Context(), w)
 }
 
 func (s *Server) editHandler(w http.ResponseWriter, r *http.Request) {
-	videoID, seconds, _, _ := s.channel.CurrentState()
+	source, position, _, _ := s.channel.CurrentState()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	components.Editor(s.channel.Playlists(), videoID, seconds).Render(r.Context(), w)
+	components.Editor(s.channel.Playlists(), source, position).Render(r.Context(), w)
 }
 
 func (s *Server) scheduleReorderHandler(w http.ResponseWriter, r *http.Request) {
@@ -64,4 +66,17 @@ func (s *Server) scheduleReorderHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// sourceFromForm parses source_kind and source_id form values into a Source.
+func sourceFromForm(r *http.Request) (channel.Source, bool) {
+	kind := channel.SourceKind(r.FormValue("source_kind"))
+	id := r.FormValue("source_id")
+	return channel.NewValidatedSource(kind, id)
+}
+
+// parseDuration parses a seconds string from a form value into a time.Duration.
+func parseDuration(r *http.Request, key string) time.Duration {
+	f, _ := strconv.ParseFloat(r.FormValue(key), 64)
+	return time.Duration(f * float64(time.Second)).Truncate(time.Second)
 }

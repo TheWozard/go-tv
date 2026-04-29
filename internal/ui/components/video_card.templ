@@ -3,9 +3,10 @@ package components
 import (
 	"fmt"
 	"go-tv/internal/channel"
+	"time"
 )
 
-templ VideoCard(v channel.Video, isActive bool, activeSeconds float64) {
+templ VideoCard(v channel.Video, isActive bool, activeAt time.Duration) {
 	{{ lenSecs := v.Length.Seconds() }}
 	{{ maxSecs := lenSecs; if maxSecs <= 0 { maxSecs = 600 } }}
 	<li
@@ -35,7 +36,7 @@ templ VideoCard(v channel.Video, isActive bool, activeSeconds float64) {
 						hx-post="/api/jump"
 						hx-target="#video-list"
 						hx-swap="outerHTML"
-						hx-vals={ `{"video_id":"` + v.Source.ID + `","seconds":"0"}` }
+						hx-vals={ `{"source_kind":"` + string(v.Source.Kind) + `","source_id":"` + v.Source.ID + `","seconds":"0"}` }
 					>▶</button>
 				</span>
 			</div>
@@ -63,11 +64,12 @@ templ VideoCard(v channel.Video, isActive bool, activeSeconds float64) {
 			</div>
 			<div id={ "sb-panel-" + v.Source.ID }></div>
 			if isActive {
+				{{ activeSecs := activeAt.Seconds() }}
 				<div class="pos-wrap">
 					<div class="pos-slider-wrap">
 						<div
 							class="pos-fill"
-							style={ fmt.Sprintf("width:%.2f%%", activeSeconds/maxSecs*100) }
+							style={ fmt.Sprintf("width:%.2f%%", activeSecs/maxSecs*100) }
 						></div>
 						<input
 							class="pos-range"
@@ -75,19 +77,19 @@ templ VideoCard(v channel.Video, isActive bool, activeSeconds float64) {
 							min="0"
 							max={ fmt.Sprintf("%g", maxSecs) }
 							step="1"
-							value={ fmt.Sprintf("%g", activeSeconds) }
+							value={ fmt.Sprintf("%g", activeSecs) }
 							name="seconds"
 							hx-post="/api/jump"
 							hx-trigger="change"
 							hx-swap="none"
-							hx-vals={ `{"video_id":"` + v.Source.ID + `"}` }
+							hx-vals={ `{"source_kind":"` + string(v.Source.Kind) + `","source_id":"` + v.Source.ID + `"}` }
 							oninput="updatePosFill(this)"
 							onmousedown="event.stopPropagation()"
 						/>
 					</div>
 					<div class="times text-muted">
 						<span>Now Playing</span>
-						<span class="pos-display">{ fmtSecs(activeSeconds) }</span>
+						<span class="pos-display">{ fmtSecs(activeSecs) }</span>
 					</div>
 				</div>
 			}
