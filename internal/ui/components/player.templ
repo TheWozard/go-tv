@@ -18,11 +18,17 @@ templ Player(source channel.Source, position, stopAt time.Duration, player confi
 			<div
 				id="player-wrapper"
 				data-skip-interval-ms={ fmt.Sprintf("%d", player.SkipInterval.Duration().Milliseconds()) }
-				data-advance-rate-ms={ fmt.Sprintf("%d", player.AdvanceRate.Duration().Milliseconds()) }
-				data-progress-rate-ms={ fmt.Sprintf("%d", player.ProgressRate.Duration().Milliseconds()) }
+		data-progress-rate-ms={ fmt.Sprintf("%d", player.ProgressRate.Duration().Milliseconds()) }
 			>
 				<div id="player"></div>
-				<div id="overlay"></div>
+				<div id="overlay">
+					<div id="progress-bar-wrap">
+						<div id="progress-bar-track">
+							<div id="progress-bar-fill"></div>
+							<div id="progress-bar-stop"></div>
+						</div>
+					</div>
+				</div>
 			</div>
 			<script src="https://www.youtube.com/iframe_api" async></script>
 		</body>

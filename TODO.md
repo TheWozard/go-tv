@@ -1,0 +1,1 @@
+- [x] Marker on playback to indicate stop point.

@@ -28,7 +28,6 @@ func (d Duration) Duration() time.Duration { return time.Duration(d) }
 
 type Player struct {
 	SkipInterval Duration `yaml:"skip_interval"`
-	AdvanceRate  Duration `yaml:"advance_rate"`
 	ProgressRate Duration `yaml:"progress_rate"`
 }
 
@@ -85,8 +84,7 @@ func Load(path string) (*Config, error) {
 		},
 		Player: Player{
 			SkipInterval: Duration(10 * time.Second),
-			AdvanceRate:  Duration(time.Second),
-			ProgressRate: Duration(10 * time.Second),
+	ProgressRate: Duration(10 * time.Second),
 		},
 	}
 

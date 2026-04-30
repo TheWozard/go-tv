@@ -42,7 +42,10 @@ func (h *PlayerHandler) nextHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	newSource, newPosition, newStop, _ := h.channel.CurrentState()
-	streamURL := h.jellyfin.StreamURL(newSource.ID)
+	streamURL := ""
+	if newSource.Kind == channel.SourceKindJellyfin {
+		streamURL = h.jellyfin.StreamURL(newSource.ID)
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	components.PlayerState(newSource, newPosition, newStop, streamURL).Render(r.Context(), w)
 }

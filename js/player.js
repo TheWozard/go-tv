@@ -33,23 +33,33 @@ function advance() {
 // it only seeks when positions are more than 5s apart (avoids seek loops).
 function applyState(sourceKind, sourceId, seconds, stopSeconds, streamURL) {
   state.currentStop = stopSeconds;
-  if (state.currentSource?.kind === sourceKind && state.currentSource?.id === sourceId) {
+
+  const sameSource = state.currentSource?.kind === sourceKind && state.currentSource?.id === sourceId;
+  const sameKind   = state.currentSource?.kind === sourceKind;
+  state.currentSource = { kind: sourceKind, id: sourceId };
+
+  if (sameSource) {
     if (state.player && Math.abs(state.player.getCurrentTime() - seconds) > 5) {
       state.player.seekTo(seconds);
     }
     return;
   }
-  state.currentSource = { kind: sourceKind, id: sourceId };
-  if (state.player) {
-    if (sourceKind === 'youtube') {
+
+  if (!state.player) return;
+
+  if (sourceKind === 'youtube') {
+    if (sameKind) {
       state.player.loadVideo(sourceId, seconds);
+    } else {
+      // Switching from Jellyfin → YouTube: create a new YouTube backend.
+      ytReady.then(() => createYoutubeBackend('player', sourceId, seconds, { onEnded: advance, onError: advance }))
+        .then(backend => { state.player = backend; });
     }
-    // For jellyfin a source change means a different stream URL — re-init.
-    if (sourceKind === 'jellyfin') {
-      createJellyfinBackend('player', streamURL, seconds, { onEnded: advance, onError: advance })
-        .then(backend => { state.player = backend; })
-        .catch(() => advance());
-    }
+  } else if (sourceKind === 'jellyfin') {
+    // Always re-init for Jellyfin (new item = new stream URL).
+    createJellyfinBackend('player', streamURL, seconds, { onEnded: advance, onError: advance })
+      .then(backend => { state.player = backend; })
+      .catch(() => advance());
   }
 }
 
@@ -80,15 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const wrapper = document.getElementById('player-wrapper');
 
-  // Advance check: frequent so stop-time is caught promptly.
-  const advanceMs = parseInt(wrapper?.dataset.advanceRateMs, 10) || 1000;
-  setInterval(() => {
-    const t = playingTime();
-    if (t === null) return;
-    if (state.currentStop > 0 && t >= state.currentStop) advance();
-  }, advanceMs);
-
-  // Progress report: less frequent, just keeps the server in sync.
+  // Progress report: keeps the server in sync with playback position.
   const progressMs = parseInt(wrapper?.dataset.progressRateMs, 10) || 10000;
   setInterval(() => {
     const t = playingTime();

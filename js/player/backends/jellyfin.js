@@ -40,6 +40,7 @@ function wrap(video) {
     pause()          { video.pause(); },
     seekTo(s)        { video.currentTime = s; },
     getCurrentTime() { return video.currentTime; },
+    getDuration()    { return isFinite(video.duration) ? video.duration : 0; },
     getState() {
       if (video.ended)  return 'ended';
       if (video.paused) return 'paused';
