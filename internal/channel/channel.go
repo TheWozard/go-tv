@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+var (
+	ErrVideoNotInSchedule = errors.New("video not in schedule")
+	ErrNoNextFragment     = errors.New("no next fragment")
+)
+
 // Channel coordinates schedule and state for a single channel.
 type Channel struct {
 	schedule *Schedule
@@ -40,7 +45,7 @@ func (c *Channel) Progress(source Source, position time.Duration) {
 // Jump unconditionally moves playback to source at position.
 func (c *Channel) Jump(source Source, position time.Duration) error {
 	if _, ok := c.schedule.Find(source); !ok {
-		return errors.New("video not in schedule")
+		return ErrVideoNotInSchedule
 	}
 	c.state.Jump(source, position)
 	return nil
@@ -50,7 +55,7 @@ func (c *Channel) Jump(source Source, position time.Duration) error {
 func (c *Channel) Next(source Source, position time.Duration) error {
 	frag, ok := c.schedule.Next(source, position)
 	if !ok {
-		return errors.New("no next fragment")
+		return ErrNoNextFragment
 	}
 	c.state.Advance(source, frag.Source, frag.Start)
 	return nil
@@ -106,7 +111,7 @@ type CutRange struct {
 func (c *Channel) ApplyCuts(videoID string, cuts []CutRange) (*Video, error) {
 	video, ok := c.schedule.Find(NewYoutubeSource(videoID))
 	if !ok {
-		return nil, errors.New("video not in schedule")
+		return nil, ErrVideoNotInSchedule
 	}
 
 	const minDur = 10 * time.Second

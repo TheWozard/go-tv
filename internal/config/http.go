@@ -2,8 +2,9 @@ package config
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log"
+	"go-tv/internal/log"
 	"net/http"
 
 	"tailscale.com/tsnet"
@@ -19,12 +20,12 @@ func (t Tailscale) Enabled() bool { return t.Hostname != "" }
 
 // Listen starts an HTTPS server over Tailscale and blocks until ctx
 // is cancelled, then shuts down gracefully.
-func (t Tailscale) Listen(ctx context.Context, handler http.Handler) error {
+func (t Tailscale) Listen(ctx context.Context, handler http.Handler, logger *log.Logger) error {
 	ts := &tsnet.Server{
 		Dir:      t.Dir,
 		Hostname: t.Hostname,
 	}
-	defer ts.Close()
+	defer func() { _ = ts.Close() }()
 
 	ln, err := ts.ListenTLS("tcp", fmt.Sprintf(":%s", t.Port))
 	if err != nil {
@@ -34,20 +35,22 @@ func (t Tailscale) Listen(ctx context.Context, handler http.Handler) error {
 	lc, err := ts.LocalClient()
 	if err == nil {
 		if status, err := lc.Status(ctx); err == nil && status.Self != nil {
-			log.Printf("go-tv listening on https://%s", status.Self.DNSName)
+			logger.Info("listening", "addr", "https://"+status.Self.DNSName)
 		}
 	}
 	if err != nil {
-		log.Printf("go-tv listening on tailscale hostname %s", t.Hostname)
+		logger.Info("listening", "addr", "https://"+t.Hostname)
 	}
 
 	srv := &http.Server{Handler: handler}
 	go func() {
 		<-ctx.Done()
-		srv.Shutdown(context.Background())
+		if err := srv.Shutdown(context.Background()); err != nil {
+			logger.Error("tailscale shutdown", err)
+		}
 	}()
 
-	if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
+	if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 	return nil
@@ -59,17 +62,19 @@ type Server struct {
 
 // Listen starts an HTTP server and blocks until ctx is cancelled, then
 // shuts down gracefully.
-func (s Server) Listen(ctx context.Context, handler http.Handler) error {
+func (s Server) Listen(ctx context.Context, handler http.Handler, logger *log.Logger) error {
 	addr := fmt.Sprintf(":%s", s.Port)
 	srv := &http.Server{Addr: addr, Handler: handler}
 
 	go func() {
 		<-ctx.Done()
-		srv.Shutdown(context.Background())
+		if err := srv.Shutdown(context.Background()); err != nil {
+			logger.Error("server shutdown", err)
+		}
 	}()
 
-	log.Printf("go-tv listening on http://localhost%s", addr)
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	logger.Info("listening", "addr", "http://localhost"+addr)
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 	return nil

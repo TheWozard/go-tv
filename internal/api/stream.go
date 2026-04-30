@@ -36,7 +36,7 @@ func (h *StreamHandler) proxyHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "upstream error", http.StatusBadGateway)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	ct := resp.Header.Get("Content-Type")
 	if ct != "" {
@@ -52,12 +52,12 @@ func (h *StreamHandler) proxyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		cleaned := stripAPIKey(string(body), h.jellyfin.APIKey)
 		w.WriteHeader(resp.StatusCode)
-		io.WriteString(w, cleaned)
+		_, _ = io.WriteString(w, cleaned)
 		return
 	}
 
 	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+	_, _ = io.Copy(w, resp.Body)
 }
 
 // isPlaylist returns true if the response is an HLS playlist.

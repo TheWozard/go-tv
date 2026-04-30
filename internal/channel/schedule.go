@@ -37,7 +37,7 @@ func LoadSchedule(path string) (*Schedule, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	var s Schedule
 	if err := json.NewDecoder(f).Decode(&s); err != nil {
 		return nil, err
@@ -47,14 +47,18 @@ func LoadSchedule(path string) (*Schedule, error) {
 }
 
 // Save writes the schedule to disk as pretty-printed JSON.
-func (s *Schedule) Save() error {
+func (s *Schedule) Save() (err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	f, err := os.Create(s.path)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		if cerr := f.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
 	return enc.Encode(s)

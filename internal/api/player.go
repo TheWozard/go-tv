@@ -7,6 +7,7 @@ import (
 
 	"go-tv/internal/channel"
 	"go-tv/internal/config"
+	"go-tv/internal/log"
 	"go-tv/internal/ui/components"
 )
 
@@ -14,6 +15,7 @@ import (
 type PlayerHandler struct {
 	channel  *channel.Channel
 	jellyfin config.Jellyfin
+	logger   *log.Logger
 }
 
 func (h *PlayerHandler) Mount(r chi.Router) {
@@ -47,5 +49,7 @@ func (h *PlayerHandler) nextHandler(w http.ResponseWriter, r *http.Request) {
 		streamURL = h.jellyfin.StreamURL(newSource.ID)
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	components.PlayerState(newSource, newPosition, newStop, streamURL).Render(r.Context(), w)
+	if err := components.PlayerState(newSource, newPosition, newStop, streamURL).Render(r.Context(), w); err != nil {
+		h.logger.Error("render player state", err)
+	}
 }

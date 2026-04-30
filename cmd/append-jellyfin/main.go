@@ -16,7 +16,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -73,10 +73,12 @@ func main() {
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
-		log.Fatalf("config: %v", err)
+		slog.Error("failed to load config", "err", err)
+		os.Exit(1)
 	}
 	if cfg.Jellyfin.URL == "" {
-		log.Fatal("jellyfin.url not set in config")
+		slog.Error("jellyfin.url not set in config")
+		os.Exit(1)
 	}
 
 	items := search(cfg.Jellyfin, query, *limit)
@@ -103,7 +105,8 @@ func main() {
 	if os.IsNotExist(err) {
 		sched = channel.NewSchedule(*schedPath)
 	} else if err != nil {
-		log.Fatal(err)
+		slog.Error("failed to load schedule", "err", err)
+		os.Exit(1)
 	}
 
 	videos := make([]channel.Video, 0, len(selected))
@@ -127,7 +130,8 @@ func main() {
 	fmt.Printf("added %q (%d video(s))\n", name, len(videos))
 
 	if err := sched.Save(); err != nil {
-		log.Fatal(err)
+		slog.Error("failed to save schedule", "err", err)
+		os.Exit(1)
 	}
 	fmt.Printf("appended to %s\n", *schedPath)
 }
@@ -135,7 +139,8 @@ func main() {
 func search(jf config.Jellyfin, query string, limit int) []jfItem {
 	u, err := url.Parse(jf.URL + "/Items")
 	if err != nil {
-		log.Fatalf("invalid jellyfin url: %v", err)
+		slog.Error("invalid jellyfin url", "err", err)
+		os.Exit(1)
 	}
 	q := u.Query()
 	q.Set("searchTerm", query)
@@ -148,18 +153,21 @@ func search(jf config.Jellyfin, query string, limit int) []jfItem {
 
 	resp, err := jf.HTTPClient().Get(u.String())
 	if err != nil {
-		log.Fatalf("jellyfin search: %v", err)
+		slog.Error("jellyfin search failed", "err", err)
+		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		log.Fatalf("jellyfin search: %s", resp.Status)
+		slog.Error("jellyfin search failed", "status", resp.Status)
+		os.Exit(1)
 	}
 
 	var result struct {
 		Items []jfItem `json:"Items"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		log.Fatalf("parsing response: %v", err)
+		slog.Error("parsing response", "err", err)
+		os.Exit(1)
 	}
 	return result.Items
 }

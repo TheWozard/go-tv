@@ -33,7 +33,7 @@ func LoadState(path string, schedule *Schedule) *State {
 	if err != nil {
 		return first.toState(path)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var state State
 	if err := json.NewDecoder(f).Decode(&state); err != nil {
@@ -50,14 +50,18 @@ func LoadState(path string, schedule *Schedule) *State {
 }
 
 // Save persists the current state to disk.
-func (s *State) Save() error {
+func (s *State) Save() (err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	f, err := os.Create(s.path)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		if cerr := f.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 	return json.NewEncoder(f).Encode(s)
 }
 

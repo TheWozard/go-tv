@@ -10,11 +10,12 @@ import (
 
 	"go-tv/internal/channel"
 	"go-tv/internal/config"
+	"go-tv/internal/log"
 	"go-tv/internal/ui/components"
 )
 
-func OpenChannel(r chi.Router, ch *channel.Channel, player config.Player, jellyfin config.Jellyfin) {
-	s := &Server{channel: ch, player: player, jellyfin: jellyfin}
+func OpenChannel(r chi.Router, ch *channel.Channel, player config.Player, jellyfin config.Jellyfin, logger *log.Logger) {
+	s := &Server{channel: ch, player: player, jellyfin: jellyfin, logger: logger}
 	s.Route(r)
 }
 
@@ -22,11 +23,12 @@ type Server struct {
 	channel  *channel.Channel
 	player   config.Player
 	jellyfin config.Jellyfin
+	logger   *log.Logger
 }
 
 func (s *Server) Route(r chi.Router) {
-	player := &PlayerHandler{channel: s.channel, jellyfin: s.jellyfin}
-	editor := &EditorHandler{channel: s.channel, jellyfin: s.jellyfin}
+	player := &PlayerHandler{channel: s.channel, jellyfin: s.jellyfin, logger: s.logger}
+	editor := &EditorHandler{channel: s.channel, jellyfin: s.jellyfin, logger: s.logger}
 
 	r.Get("/", s.playerHandler)
 	r.Get("/edit", s.editHandler)
@@ -44,13 +46,17 @@ func (s *Server) Route(r chi.Router) {
 func (s *Server) playerHandler(w http.ResponseWriter, r *http.Request) {
 	source, position, stopAt, _ := s.channel.CurrentState()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	components.Player(source, position, stopAt, s.player, s.jellyfin).Render(r.Context(), w)
+	if err := components.Player(source, position, stopAt, s.player, s.jellyfin).Render(r.Context(), w); err != nil {
+		s.logger.Error("render player", err)
+	}
 }
 
 func (s *Server) editHandler(w http.ResponseWriter, r *http.Request) {
 	source, position, _, _ := s.channel.CurrentState()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	components.Editor(s.channel.Playlists(), source, position, s.jellyfin.URL).Render(r.Context(), w)
+	if err := components.Editor(s.channel.Playlists(), source, position, s.jellyfin.URL).Render(r.Context(), w); err != nil {
+		s.logger.Error("render editor", err)
+	}
 }
 
 func (s *Server) scheduleReorderHandler(w http.ResponseWriter, r *http.Request) {

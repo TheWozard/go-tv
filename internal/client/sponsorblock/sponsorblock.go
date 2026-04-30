@@ -4,12 +4,15 @@ package sponsorblock
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 )
+
+var ErrUnexpectedStatus = errors.New("sponsorblock: unexpected status")
 
 const baseURL = "https://sponsor.ajay.app"
 
@@ -109,13 +112,13 @@ func (c *Client) GetSegments(videoID string, categories []Category) ([]Segment, 
 	if err != nil {
 		return nil, fmt.Errorf("sponsorblock: request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, nil // no segments for this video
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("sponsorblock: unexpected status %d", resp.StatusCode)
+		return nil, fmt.Errorf("%w %d", ErrUnexpectedStatus, resp.StatusCode)
 	}
 
 	var segments []Segment
@@ -190,13 +193,13 @@ func (c *Client) SearchSegments(params SearchParams) (*SearchResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("sponsorblock: request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return &SearchResponse{}, nil
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("sponsorblock: unexpected status %d", resp.StatusCode)
+		return nil, fmt.Errorf("%w %d", ErrUnexpectedStatus, resp.StatusCode)
 	}
 
 	var result SearchResponse

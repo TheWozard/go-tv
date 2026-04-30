@@ -17,7 +17,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"sort"
 	"strconv"
@@ -43,7 +43,8 @@ func main() {
 
 	sched, err := channel.LoadSchedule(*schedPath)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("failed to load schedule", "err", err)
+		os.Exit(1)
 	}
 
 	client := sponsorblock.New()
@@ -55,7 +56,8 @@ func main() {
 	}
 	segments, err := client.GetSegments(videoID, categories)
 	if err != nil {
-		log.Fatalf("%s: %v", videoID, err)
+		slog.Error("failed to get segments", "video", videoID, "err", err)
+		os.Exit(1)
 	}
 	if len(segments) == 0 {
 		fmt.Printf("no segments found for %s\n", videoID)
@@ -184,7 +186,8 @@ func main() {
 
 	sched.Update(items)
 	if err := sched.Save(); err != nil {
-		log.Fatal(err)
+		slog.Error("failed to save schedule", "err", err)
+		os.Exit(1)
 	}
 	fmt.Printf("\nsaved to %s\n", *schedPath)
 }

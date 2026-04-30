@@ -8,7 +8,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
+	"os"
 
 	"go-tv/internal/channel"
 )
@@ -19,7 +20,8 @@ func main() {
 
 	sched, err := channel.LoadSchedule(*schedPath)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("failed to load schedule", "err", err)
+		os.Exit(1)
 	}
 
 	items := sched.AllItems()
@@ -31,7 +33,8 @@ func main() {
 
 	sched.Update(items)
 	if err := sched.Save(); err != nil {
-		log.Fatal(err)
+		slog.Error("failed to save schedule", "err", err)
+		os.Exit(1)
 	}
 	fmt.Printf("cleaned %s\n", *schedPath)
 }

@@ -5,7 +5,6 @@ import (
 	"embed"
 	"flag"
 	"io/fs"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -28,12 +27,16 @@ func main() {
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
-		log.Fatalf("failed to load config: %v", err)
+		config.Logger{Level: "info"}.New().Error("failed to load config", err)
+		os.Exit(1)
 	}
+
+	logger := cfg.Logger.New()
 
 	schedule, err := channel.LoadSchedule(cfg.SchedulePath)
 	if err != nil {
-		log.Fatalf("failed to load schedule: %v", err)
+		logger.Error("failed to load schedule", err)
+		os.Exit(1)
 	}
 	currentState := channel.LoadState(cfg.StatePath, schedule)
 
@@ -43,20 +46,23 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 	ch := channel.NewChannel(schedule, currentState)
-	api.OpenChannel(r, ch, cfg.Player, cfg.Jellyfin)
+	api.OpenChannel(r, ch, cfg.Player, cfg.Jellyfin, logger)
 
 	sub, err := fs.Sub(staticFiles, "static")
 	if err != nil {
-		log.Fatalf("failed to prepare static FS: %v", err)
+		logger.Error("failed to prepare static FS", err)
+		os.Exit(1)
 	}
 	r.Handle("/*", http.FileServer(http.FS(sub)))
 
-	if err = cfg.GetServerListener().Listen(ctx, r); err != nil {
-		log.Fatal(err)
+	if err = cfg.GetServerListener().Listen(ctx, r, logger); err != nil {
+		logger.Error("server error", err)
+		os.Exit(1)
 	}
 
-	log.Println("shutting down")
+	logger.Info("shutting down")
 	if err := ch.SaveState(); err != nil {
-		log.Printf("failed to save state: %v", err)
+		logger.Error("failed to save state", err)
+		os.Exit(1)
 	}
 }

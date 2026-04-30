@@ -11,6 +11,7 @@ import (
 	"go-tv/internal/channel"
 	"go-tv/internal/client/sponsorblock"
 	"go-tv/internal/config"
+	"go-tv/internal/log"
 	"go-tv/internal/ui/components"
 )
 
@@ -18,6 +19,7 @@ import (
 type EditorHandler struct {
 	channel  *channel.Channel
 	jellyfin config.Jellyfin
+	logger   *log.Logger
 }
 
 func (h *EditorHandler) Mount(r chi.Router) {
@@ -39,7 +41,9 @@ func (h *EditorHandler) jumpHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	activeSource, activeAt, _, _ := h.channel.CurrentState()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	components.VideoList(h.channel.Playlists(), activeSource, activeAt, h.jellyfin.URL).Render(r.Context(), w)
+	if err := components.VideoList(h.channel.Playlists(), activeSource, activeAt, h.jellyfin.URL).Render(r.Context(), w); err != nil {
+		h.logger.Error("render video list", err)
+	}
 }
 
 func (h *EditorHandler) renameHandler(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +77,9 @@ func (h *EditorHandler) sbGetHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	components.SponsorBlockPanel(videoID, sbSegs).Render(r.Context(), w)
+	if err := components.SponsorBlockPanel(videoID, sbSegs).Render(r.Context(), w); err != nil {
+		h.logger.Error("render sponsor block panel", err)
+	}
 }
 
 func (h *EditorHandler) sbPostHandler(w http.ResponseWriter, r *http.Request) {
@@ -101,5 +107,7 @@ func (h *EditorHandler) sbPostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	components.VideoCard(*updated, false, 0, h.jellyfin.URL).Render(r.Context(), w)
+	if err := components.VideoCard(*updated, false, 0, h.jellyfin.URL).Render(r.Context(), w); err != nil {
+		h.logger.Error("render video card", err)
+	}
 }

@@ -17,7 +17,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"time"
@@ -44,14 +44,16 @@ func main() {
 
 	entries := fetch(flag.Arg(0))
 	if len(entries) == 0 {
-		log.Fatal("no videos found")
+		slog.Error("no videos found")
+		os.Exit(1)
 	}
 
 	sched, err := channel.LoadSchedule(*schedPath)
 	if os.IsNotExist(err) {
 		sched = channel.NewSchedule(*schedPath)
 	} else if err != nil {
-		log.Fatal(err)
+		slog.Error("failed to load schedule", "err", err)
+		os.Exit(1)
 	}
 
 	name := entries[0].PlaylistTitle
@@ -70,7 +72,8 @@ func main() {
 	sched.Update(items)
 
 	if err := sched.Save(); err != nil {
-		log.Fatal(err)
+		slog.Error("failed to save schedule", "err", err)
+		os.Exit(1)
 	}
 	fmt.Printf("appended to %s\n", *schedPath)
 }
@@ -90,7 +93,8 @@ func toVideo(e ytInfo) channel.Video {
 func fetch(url string) []ytInfo {
 	out, err := exec.Command("yt-dlp", "--flat-playlist", "--dump-json", url).Output()
 	if err != nil {
-		log.Fatalf("yt-dlp: %v", err)
+		slog.Error("yt-dlp failed", "err", err)
+		os.Exit(1)
 	}
 
 	var entries []ytInfo
@@ -98,7 +102,8 @@ func fetch(url string) []ytInfo {
 	for dec.More() {
 		var info ytInfo
 		if err := dec.Decode(&info); err != nil {
-			log.Fatalf("parsing yt-dlp output: %v", err)
+			slog.Error("parsing yt-dlp output", "err", err)
+			os.Exit(1)
 		}
 		entries = append(entries, info)
 	}
