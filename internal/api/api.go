@@ -33,6 +33,10 @@ func (s *Server) Route(r chi.Router) {
 	r.Route("/api", func(r chi.Router) {
 		player.Mount(r)
 		editor.Mount(r)
+		if s.jellyfin.Proxy {
+			stream := &StreamHandler{jellyfin: s.jellyfin, client: s.jellyfin.HTTPClient()}
+			stream.Mount(r)
+		}
 		r.Post("/schedule/reorder", s.scheduleReorderHandler)
 	})
 }
