@@ -10,12 +10,14 @@ import (
 
 	"go-tv/internal/channel"
 	"go-tv/internal/client/sponsorblock"
+	"go-tv/internal/config"
 	"go-tv/internal/ui/components"
 )
 
 // EditorHandler serves HTMX endpoints used by the editor page.
 type EditorHandler struct {
-	channel *channel.Channel
+	channel  *channel.Channel
+	jellyfin config.Jellyfin
 }
 
 func (h *EditorHandler) Mount(r chi.Router) {
@@ -37,7 +39,7 @@ func (h *EditorHandler) jumpHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	activeSource, activeAt, _, _ := h.channel.CurrentState()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	components.VideoList(h.channel.Playlists(), activeSource, activeAt).Render(r.Context(), w)
+	components.VideoList(h.channel.Playlists(), activeSource, activeAt, h.jellyfin.URL).Render(r.Context(), w)
 }
 
 func (h *EditorHandler) renameHandler(w http.ResponseWriter, r *http.Request) {
@@ -99,5 +101,5 @@ func (h *EditorHandler) sbPostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	components.VideoCard(*updated, false, 0).Render(r.Context(), w)
+	components.VideoCard(*updated, false, 0, h.jellyfin.URL).Render(r.Context(), w)
 }

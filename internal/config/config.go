@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"io/fs"
 	"net/http"
@@ -31,12 +32,42 @@ type Player struct {
 	ProgressRate Duration `yaml:"progress_rate"`
 }
 
+type Jellyfin struct {
+	URL           string `yaml:"url"`
+	APIKey        string `yaml:"api_key"`
+	InsecureSkipTLS bool `yaml:"insecure_skip_tls"`
+}
+
+// StreamURL returns the direct Jellyfin HLS URL for the given item.
+// Returns an empty string when Jellyfin is not configured.
+func (j Jellyfin) StreamURL(itemID string) string {
+	if j.URL == "" || itemID == "" {
+		return ""
+	}
+	return j.URL + "/Videos/" + itemID + "/master.m3u8?MediaSourceId=" + itemID + "&VideoCodec=h264&AudioCodec=aac&api_key=" + j.APIKey
+}
+
+// HTTPClient returns an HTTP client configured for this Jellyfin instance.
+// When InsecureSkipTLS is true, TLS certificate verification is disabled.
+func (j Jellyfin) HTTPClient() *http.Client {
+	if !j.InsecureSkipTLS {
+		return http.DefaultClient
+	}
+	return &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+		},
+	}
+}
+
+
 type Config struct {
 	SchedulePath string    `yaml:"schedule"`
 	StatePath    string    `yaml:"state"`
 	Tailscale    Tailscale `yaml:"tailscale"`
 	Server       Server    `yaml:"server"`
 	Player       Player    `yaml:"player"`
+	Jellyfin     Jellyfin  `yaml:"jellyfin"`
 }
 
 // Load reads a YAML config file and returns a Config with defaults applied.

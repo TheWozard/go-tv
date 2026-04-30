@@ -7,13 +7,14 @@ import (
 )
 
 // PlayerState is the fragment that carries current playback state.
-// The YouTube bridge in player.js reads these data-* attributes via MutationObserver.
-templ PlayerState(source channel.Source, position, stopAt time.Duration) {
+// The player bridge in player.js reads these data-* attributes via MutationObserver.
+templ PlayerState(source channel.Source, position, stopAt time.Duration, streamURL string) {
 	<div
 		id="player-state"
 		data-source-kind={ string(source.Kind) }
 		data-source-id={ source.ID }
 		data-position={ fmt.Sprintf("%g", position.Seconds()) }
 		data-stop-at={ fmt.Sprintf("%g", stopAt.Seconds()) }
+		data-stream-url={ streamURL }
 	></div>
 }

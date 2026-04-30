@@ -6,12 +6,14 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"go-tv/internal/channel"
+	"go-tv/internal/config"
 	"go-tv/internal/ui/components"
 )
 
 // PlayerHandler serves HTMX endpoints used by the player page.
 type PlayerHandler struct {
-	channel *channel.Channel
+	channel  *channel.Channel
+	jellyfin config.Jellyfin
 }
 
 func (h *PlayerHandler) Mount(r chi.Router) {
@@ -40,6 +42,7 @@ func (h *PlayerHandler) nextHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	newSource, newPosition, newStop, _ := h.channel.CurrentState()
+	streamURL := h.jellyfin.StreamURL(newSource.ID)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	components.PlayerState(newSource, newPosition, newStop).Render(r.Context(), w)
+	components.PlayerState(newSource, newPosition, newStop, streamURL).Render(r.Context(), w)
 }

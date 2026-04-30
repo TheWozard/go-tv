@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-templ SetGroup(set channel.Playlist, active channel.Source, activeAt time.Duration) {
+templ SetGroup(set channel.Playlist, active channel.Source, activeAt time.Duration, jellyfinBaseURL string) {
 	{{ isActiveSet := false; for _, v := range set.Videos { if v.Source.Equal(active) { isActiveSet = true; break } } }}
 	<li class={ "set-item collapsed", templ.KV("active-set", isActiveSet) }>
 		<div class="set-header">
@@ -27,7 +27,7 @@ templ SetGroup(set channel.Playlist, active channel.Source, activeAt time.Durati
 		</div>
 		<ul class="set-videos" id={ "set-videos-" + set.Name }>
 			for _, v := range set.Videos {
-				@VideoCard(v, v.Source.Equal(active), activeAt)
+				@VideoCard(v, v.Source.Equal(active), activeAt, jellyfinBaseURL)
 			}
 		</ul>
 	</li>

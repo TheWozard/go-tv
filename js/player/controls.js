@@ -12,11 +12,11 @@ export function initControls(state, advance) {
   });
 
   function togglePlayPause() {
-    if (!state.player || typeof state.player.getPlayerState !== 'function') return;
-    if (state.player.getPlayerState() === YT.PlayerState.PLAYING) {
-      state.player.pauseVideo();
+    if (!state.player) return;
+    if (state.player.getState() === 'playing') {
+      state.player.pause();
     } else {
-      state.player.playVideo();
+      state.player.play();
     }
   }
 
@@ -32,11 +32,11 @@ export function initControls(state, advance) {
       togglePlayPause();
     } else if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') {
       e.preventDefault();
-      if (!state.player || typeof state.player.seekTo !== 'function') return;
+      if (!state.player) return;
       const skipMs = parseInt(document.getElementById('player-wrapper')?.dataset.skipIntervalMs, 10) || 10_000;
       const dir = e.code === 'ArrowRight' ? 1 : -1;
       const newTime = state.player.getCurrentTime() + dir * (skipMs / 1000);
-      state.player.seekTo(newTime, true);
+      state.player.seekTo(newTime);
       if (dir > 0 && state.currentStop > 0 && newTime >= state.currentStop) advance();
     }
   });

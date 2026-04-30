@@ -4,8 +4,9 @@ package channel
 type SourceKind string
 
 const (
-	SourceKindTest    SourceKind = "test"
-	SourceKindYoutube SourceKind = "youtube"
+	SourceKindTest     SourceKind = "test"
+	SourceKindYoutube  SourceKind = "youtube"
+	SourceKindJellyfin SourceKind = "jellyfin"
 )
 
 // newSource creates a source with the given kind and ID.
@@ -20,7 +21,7 @@ func NewValidatedSource(kind SourceKind, id string) (Source, bool) {
 		return Source{}, false
 	}
 	switch kind {
-	case SourceKindYoutube, SourceKindTest:
+	case SourceKindYoutube, SourceKindTest, SourceKindJellyfin:
 		return newSource(kind, id), true
 	default:
 		return Source{}, false
@@ -33,6 +34,10 @@ func NewTestSource(id string) Source {
 
 func NewYoutubeSource(id string) Source {
 	return newSource(SourceKindYoutube, id)
+}
+
+func NewJellyfinSource(id string) Source {
+	return newSource(SourceKindJellyfin, id)
 }
 
 // Source identifies a video on a specific platform.

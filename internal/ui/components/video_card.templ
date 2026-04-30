@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-templ VideoCard(v channel.Video, isActive bool, activeAt time.Duration) {
+templ VideoCard(v channel.Video, isActive bool, activeAt time.Duration, jellyfinBaseURL string) {
 	{{ lenSecs := v.Length.Seconds() }}
 	{{ maxSecs := lenSecs; if maxSecs <= 0 { maxSecs = 600 } }}
 	<li
@@ -24,12 +24,23 @@ templ VideoCard(v channel.Video, isActive bool, activeAt time.Duration) {
 					}
 				</span>
 				<span class="meta-right">
-					<a
-						class="vid-id yt-link text-muted"
-						href={ templ.URL("https://www.youtube.com/watch?v=" + v.Source.ID) }
-						target="_blank"
-						rel="noopener"
-					>↗ { v.Source.ID }</a>
+					if v.Source.Kind == channel.SourceKindYoutube {
+						<a
+							class="vid-id yt-link text-muted"
+							href={ templ.URL("https://www.youtube.com/watch?v=" + v.Source.ID) }
+							target="_blank"
+							rel="noopener"
+						>↗ { v.Source.ID }</a>
+					} else if v.Source.Kind == channel.SourceKindJellyfin {
+						<a
+							class="vid-id jf-link text-muted"
+							href={ templ.URL(jellyfinBaseURL + "/web/index.html#!/details?id=" + v.Source.ID) }
+							target="_blank"
+							rel="noopener"
+						>↗ { v.Source.ID }</a>
+					} else {
+						<span class="vid-id text-muted">{ v.Source.ID }</span>
+					}
 					<button
 						class="play-btn"
 						title="jump to this video"
@@ -54,13 +65,15 @@ templ VideoCard(v channel.Video, isActive bool, activeAt time.Duration) {
 						}
 					}
 				</div>
-				<button
-					class="sb-btn"
-					title="check SponsorBlock segments"
-					hx-get={ "/api/sponsorblock/" + v.Source.ID }
-				hx-target={ "#sb-panel-" + v.Source.ID }
-				hx-swap="outerHTML"
-				>SB</button>
+				if v.Source.Kind == channel.SourceKindYoutube {
+					<button
+						class="sb-btn"
+						title="check SponsorBlock segments"
+						hx-get={ "/api/sponsorblock/" + v.Source.ID }
+					hx-target={ "#sb-panel-" + v.Source.ID }
+					hx-swap="outerHTML"
+					>SB</button>
+				}
 			</div>
 			<div id={ "sb-panel-" + v.Source.ID }></div>
 			if isActive {

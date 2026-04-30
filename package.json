@@ -5,6 +5,7 @@
     "watch": "esbuild js/*.js css/*.css --bundle --platform=browser --format=iife --outbase=. --outdir=static --watch"
   },
   "dependencies": {
+    "hls.js": "^1.6.16",
     "htmx.org": "^2.0.4",
     "lodash-es": "^4.17.21",
     "sortablejs": "^1.15.6"

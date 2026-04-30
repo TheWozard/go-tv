@@ -43,7 +43,7 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 	ch := channel.NewChannel(schedule, currentState)
-	api.OpenChannel(r, ch, cfg.Player)
+	api.OpenChannel(r, ch, cfg.Player, cfg.Jellyfin)
 
 	sub, err := fs.Sub(staticFiles, "static")
 	if err != nil {

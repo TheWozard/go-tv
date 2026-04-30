@@ -13,19 +13,20 @@ import (
 	"go-tv/internal/ui/components"
 )
 
-func OpenChannel(r chi.Router, ch *channel.Channel, player config.Player) {
-	s := &Server{channel: ch, player: player}
+func OpenChannel(r chi.Router, ch *channel.Channel, player config.Player, jellyfin config.Jellyfin) {
+	s := &Server{channel: ch, player: player, jellyfin: jellyfin}
 	s.Route(r)
 }
 
 type Server struct {
-	channel *channel.Channel
-	player  config.Player
+	channel  *channel.Channel
+	player   config.Player
+	jellyfin config.Jellyfin
 }
 
 func (s *Server) Route(r chi.Router) {
-	player := &PlayerHandler{channel: s.channel}
-	editor := &EditorHandler{channel: s.channel}
+	player := &PlayerHandler{channel: s.channel, jellyfin: s.jellyfin}
+	editor := &EditorHandler{channel: s.channel, jellyfin: s.jellyfin}
 
 	r.Get("/", s.playerHandler)
 	r.Get("/edit", s.editHandler)
@@ -39,13 +40,13 @@ func (s *Server) Route(r chi.Router) {
 func (s *Server) playerHandler(w http.ResponseWriter, r *http.Request) {
 	source, position, stopAt, _ := s.channel.CurrentState()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	components.Player(source, position, stopAt, s.player).Render(r.Context(), w)
+	components.Player(source, position, stopAt, s.player, s.jellyfin).Render(r.Context(), w)
 }
 
 func (s *Server) editHandler(w http.ResponseWriter, r *http.Request) {
 	source, position, _, _ := s.channel.CurrentState()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	components.Editor(s.channel.Playlists(), source, position).Render(r.Context(), w)
+	components.Editor(s.channel.Playlists(), source, position, s.jellyfin.URL).Render(r.Context(), w)
 }
 
 func (s *Server) scheduleReorderHandler(w http.ResponseWriter, r *http.Request) {

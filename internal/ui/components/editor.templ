@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-templ VideoList(sets []channel.Playlist, active channel.Source, activeAt time.Duration) {
+templ VideoList(sets []channel.Playlist, active channel.Source, activeAt time.Duration, jellyfinBaseURL string) {
 	if len(sets) == 0 {
 		<ul id="video-list">
 			<li id="status" class="text-muted">No items in schedule.</li>
@@ -13,13 +13,13 @@ templ VideoList(sets []channel.Playlist, active channel.Source, activeAt time.Du
 	} else {
 		<ul id="video-list">
 			for _, set := range sets {
-				@SetGroup(set, active, activeAt)
+				@SetGroup(set, active, activeAt, jellyfinBaseURL)
 			}
 		</ul>
 	}
 }
 
-templ Editor(sets []channel.Playlist, active channel.Source, activeAt time.Duration) {
+templ Editor(sets []channel.Playlist, active channel.Source, activeAt time.Duration, jellyfinBaseURL string) {
 	@Layout("go-tv / edit", "editor") {
 		<body class="editor">
 			<header>
@@ -28,7 +28,7 @@ templ Editor(sets []channel.Playlist, active channel.Source, activeAt time.Durat
 					<a href="/">Resume</a>
 				</nav>
 			</header>
-			@VideoList(sets, active, activeAt)
+			@VideoList(sets, active, activeAt, jellyfinBaseURL)
 		</body>
 	}
 }

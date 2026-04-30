@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-templ Player(source channel.Source, position, stopAt time.Duration, player config.Player) {
+templ Player(source channel.Source, position, stopAt time.Duration, player config.Player, jellyfin config.Jellyfin) {
 	@Layout("go-tv", "player") {
 		<body>
-			@PlayerState(source, position, stopAt)
+			@PlayerState(source, position, stopAt, jellyfinStreamURL(source, jellyfin))
 			<div id="start-screen">
 				<button class="start-btn primary" onclick="startHere()">▶ Watch Here</button>
 				<a href="/edit">Edit</a>
@@ -27,4 +27,11 @@ templ Player(source channel.Source, position, stopAt time.Duration, player confi
 			<script src="https://www.youtube.com/iframe_api" async></script>
 		</body>
 	}
+}
+
+func jellyfinStreamURL(source channel.Source, jellyfin config.Jellyfin) string {
+	if source.Kind != channel.SourceKindJellyfin {
+		return ""
+	}
+	return jellyfin.StreamURL(source.ID)
 }
