@@ -73,6 +73,59 @@ body {
   inset: 0;
   z-index: 1;
   cursor: none;
+  touch-action: manipulation;
+}
+
+.skip-indicator {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255, 255, 255, 0.9);
+  font-family: system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  pointer-events: none;
+  opacity: 0;
+  padding: 8px 20px;
+  letter-spacing: 0.03em;
+}
+
+#skip-left  { left: 8%; }
+#skip-right { right: 8%; }
+
+@keyframes skip-flash {
+  0%   { opacity: 0; }
+  15%  { opacity: 1; }
+  75%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.skip-indicator.active {
+  animation: skip-flash 0.65s ease-out forwards;
+}
+
+#fullscreen-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.75);
+  padding: 10px;
+  cursor: pointer;
+  line-height: 0;
+  opacity: 0;
+  transition: opacity 0.2s, color 0.15s;
+  z-index: 2;
+  touch-action: manipulation;
+}
+
+#fullscreen-btn.visible {
+  opacity: 1;
+}
+
+#fullscreen-btn:hover {
+  color: #fff;
 }
 
 #progress-bar-wrap {
@@ -84,6 +137,7 @@ body {
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.2s;
+  touch-action: none;
 }
 
 #progress-bar-wrap.visible {
