@@ -21,7 +21,6 @@ templ SetGroup(set channel.Playlist, active channel.Source, activeAt time.Durati
 				hx-include="next [name='old_name']"
 				hx-swap="none"
 				hx-on::after-request="if(event.detail.successful) this.nextElementSibling.value=this.value"
-				onmousedown="event.stopPropagation()"
 			/>
 			<input type="hidden" name="old_name" value={ set.Name }/>
 		</div>

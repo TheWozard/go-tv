@@ -29,7 +29,7 @@ templ SponsorBlockPanel(videoID string, segs []SBSegment) {
 	<div id={ "sb-panel-" + videoID } class="sb-panel">
 		<div class="sb-panel-header">
 			<span class="sb-panel-title">SponsorBlock</span>
-			<button class="sb-close" onclick="closeSB(this.closest('.sb-panel').id.slice(9))">✕</button>
+			<button class="sb-close">✕</button>
 		</div>
 		if len(segs) == 0 {
 			<p class="text-muted">No segments found.</p>
@@ -63,7 +63,6 @@ templ sbSegRow(seg SBSegment) {
 			class="sb-check"
 			name="cuts"
 			value={ fmt.Sprintf("%g,%g", seg.StartSeconds, seg.EndSeconds) }
-			onmousedown="event.stopPropagation()"
 		/>
 		<span
 			class="sb-cat"

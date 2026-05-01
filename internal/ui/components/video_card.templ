@@ -1,10 +1,22 @@
 package components
 
 import (
+	"encoding/json"
 	"fmt"
 	"go-tv/internal/channel"
 	"time"
 )
+
+// jumpVals returns a JSON object string for hx-vals, safely encoding source identity.
+// Pass seconds="" to omit it (when the input field supplies it separately).
+func jumpVals(kind channel.SourceKind, id, seconds string) string {
+	m := map[string]string{"source_kind": string(kind), "source_id": id}
+	if seconds != "" {
+		m["seconds"] = seconds
+	}
+	b, _ := json.Marshal(m)
+	return string(b)
+}
 
 templ VideoCard(v channel.Video, isActive bool, activeAt time.Duration, jellyfinBaseURL string) {
 	{{ lenSecs := v.Length.Seconds() }}
@@ -47,7 +59,7 @@ templ VideoCard(v channel.Video, isActive bool, activeAt time.Duration, jellyfin
 						hx-post="/api/jump"
 						hx-target="#video-list"
 						hx-swap="outerHTML"
-						hx-vals={ `{"source_kind":"` + string(v.Source.Kind) + `","source_id":"` + v.Source.ID + `","seconds":"0"}` }
+						hx-vals={ jumpVals(v.Source.Kind, v.Source.ID, "0") }
 					>▶</button>
 				</span>
 			</div>
@@ -95,9 +107,7 @@ templ VideoCard(v channel.Video, isActive bool, activeAt time.Duration, jellyfin
 							hx-post="/api/jump"
 							hx-trigger="change"
 							hx-swap="none"
-							hx-vals={ `{"source_kind":"` + string(v.Source.Kind) + `","source_id":"` + v.Source.ID + `"}` }
-							oninput="updatePosFill(this)"
-							onmousedown="event.stopPropagation()"
+							hx-vals={ jumpVals(v.Source.Kind, v.Source.ID, "") }
 						/>
 					</div>
 					<div class="times text-muted">
