@@ -10,7 +10,7 @@ html,
 body {
   width: 100%;
   height: 100%;
-  background: #111;
+  background: #000;
   overflow: hidden;
 }
 
@@ -102,30 +102,6 @@ body {
 
 .skip-indicator.active {
   animation: skip-flash 0.65s ease-out forwards;
-}
-
-#fullscreen-btn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.75);
-  padding: 10px;
-  cursor: pointer;
-  line-height: 0;
-  opacity: 0;
-  transition: opacity 0.2s, color 0.15s;
-  z-index: 2;
-  touch-action: manipulation;
-}
-
-#fullscreen-btn.visible {
-  opacity: 1;
-}
-
-#fullscreen-btn:hover {
-  color: #fff;
 }
 
 #progress-bar-wrap {

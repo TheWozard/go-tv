@@ -8,7 +8,6 @@ export function initControls(state, advance, reportProgress) {
   const progressWrap = document.getElementById('progress-bar-wrap');
   const progressFill = document.getElementById('progress-bar-fill');
   const progressStop = document.getElementById('progress-bar-stop');
-  const fullscreenBtn = document.getElementById('fullscreen-btn');
   const skipMs = parseInt(document.getElementById('player-wrapper')?.dataset.skipIntervalMs, 10) || 10_000;
 
   // Control visibility (cursor, progress bar, fullscreen button).
@@ -17,13 +16,11 @@ export function initControls(state, advance, reportProgress) {
   function showControls() {
     overlay.style.cursor = 'default';
     progressWrap?.classList.add('visible');
-    fullscreenBtn?.classList.add('visible');
   }
 
   const hideControls = debounce(() => {
     overlay.style.cursor = 'none';
     progressWrap?.classList.remove('visible');
-    fullscreenBtn?.classList.remove('visible');
   }, HIDE_DELAY_MS);
 
   overlay.addEventListener('mousemove', () => {
@@ -36,28 +33,6 @@ export function initControls(state, advance, reportProgress) {
     showControls();
     hideControls();
   }, { passive: true });
-
-  // Fullscreen toggle.
-  function toggleFullscreen() {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-    } else {
-      document.exitFullscreen();
-    }
-  }
-
-  fullscreenBtn?.addEventListener('click', e => {
-    e.stopPropagation();
-    toggleFullscreen();
-  });
-
-  document.addEventListener('fullscreenchange', () => {
-    const isFs = !!document.fullscreenElement;
-    const enter = document.getElementById('fs-enter');
-    const exit  = document.getElementById('fs-exit');
-    if (enter) enter.style.display = isFs ? 'none' : '';
-    if (exit)  exit.style.display  = isFs ? '' : 'none';
-  });
 
   // Seek to a position based on a clientX coordinate over the progress bar.
   function seekFromX(clientX) {
