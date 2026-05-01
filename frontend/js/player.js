@@ -24,21 +24,14 @@ function playingTime() {
   return state.player.getCurrentTime();
 }
 
-const wrapper = document.getElementById('player-wrapper');
-const advanceRetryMs = parseInt(wrapper?.dataset.advanceRetryMs, 10) || 2000;
-const progressRateMs = parseInt(wrapper?.dataset.progressRateMs, 10) || 10000;
+const advanceRetryMs = parseInt(document.getElementById('player-wrapper')?.dataset.advanceRetryMs, 10) || 2000;
+const progressRateMs = parseInt(document.getElementById('player-wrapper')?.dataset.progressRateMs, 10) || 10000;
 
 // advance is throttled so rapid onEnded/onError fires collapse into one call.
 // Call advance.cancel() from controls to reset the window after user interaction.
-const advance = throttle(async () => {
-  try {
-    const seconds = state.player ? state.player.getCurrentTime() : 0;
-    await postNext(state.currentSource, seconds);
-    const el = document.getElementById('player-state');
-    if (el) applyStateFromEl(el);
-  } catch {
-    state.player?.pause();
-  }
+// State is applied via the htmx:afterSwap listener; errors are handled by htmx:responseError.
+const advance = throttle(() => {
+  postNext(state.currentSource, state.player?.getCurrentTime() ?? 0);
 }, advanceRetryMs, { leading: true, trailing: false });
 
 // reportProgress throttles progress updates to progressRateMs while playing.
@@ -48,13 +41,17 @@ const reportProgress = throttle(() => {
   if (t !== null) postProgress(state.currentSource, t);
 }, progressRateMs, { leading: false, trailing: true });
 
-// applyState syncs the player to server state. If the source hasn't changed
-// it only seeks when positions are more than 5s apart (avoids seek loops).
+// loadToken increments on every source change so stale in-flight loads are discarded.
+let loadToken = 0;
+
+// applyState syncs the player to server state. On source change it immediately
+// destroys the outgoing backend and nulls state.player before async construction,
+// so the rAF loop and advance() see no player during the transition.
 function applyState(sourceKind, sourceId, seconds, stopSeconds, streamURL) {
   state.currentStop = stopSeconds;
 
   const sameSource = state.currentSource?.kind === sourceKind && state.currentSource?.id === sourceId;
-  const sameKind = state.currentSource?.kind === sourceKind;
+  const sameKind   = state.currentSource?.kind === sourceKind;
   state.currentSource = { kind: sourceKind, id: sourceId };
 
   if (sameSource) {
@@ -64,27 +61,43 @@ function applyState(sourceKind, sourceId, seconds, stopSeconds, streamURL) {
     return;
   }
 
-  if (!state.player) return;
+  // Source changed — cancel any pending advance and invalidate in-flight loads.
+  advance.cancel();
+  const token = ++loadToken;
+
+  // YouTube → YouTube: reuse the existing player, no tear-down needed.
+  if (sourceKind === 'youtube' && sameKind && state.player) {
+    state.player.loadVideo(sourceId, seconds);
+    return;
+  }
+
+  // Full backend swap: null state.player immediately so rAF/progress stop using it.
+  const outgoing = state.player;
+  state.player = null;
+  outgoing?.destroy();
 
   if (sourceKind === 'youtube') {
-    if (sameKind) {
-      state.player.loadVideo(sourceId, seconds);
-    } else {
-      // Switching from Jellyfin → YouTube: create a new YouTube backend.
-      ytReady.then(() => createYoutubeBackend('player', sourceId, seconds, { onEnded: advance, onError: advance }))
-        .then(backend => { state.player = backend; });
-    }
+    ytReady
+      .then(() => createYoutubeBackend('player', sourceId, seconds, { onEnded: advance, onError: advance }))
+      .then(backend => {
+        if (token !== loadToken) { backend.destroy(); return; }
+        state.player = backend;
+      });
   } else if (sourceKind === 'jellyfin') {
-    // Always re-init for Jellyfin (new item = new stream URL).
     createJellyfinBackend('player', streamURL, seconds, { onEnded: advance, onError: advance })
-      .then(backend => { state.player = backend; })
-      .catch(() => advance());
+      .then(backend => {
+        if (token !== loadToken) { backend.destroy(); return; }
+        state.player = backend;
+      })
+      .catch(() => { if (token === loadToken) advance(); });
   }
 }
 
 // ---- State observer ----
 
-function applyStateFromEl(el) {
+function applyCurrentState() {
+  const el = document.getElementById('player-state');
+  if (!el) return;
   applyState(
     el.dataset.sourceKind,
     el.dataset.sourceId,
@@ -95,10 +108,17 @@ function applyStateFromEl(el) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  const el = document.getElementById('player-state');
-  if (el) applyStateFromEl(el);
-
   initControls(state, advance, reportProgress);
+
+  // Apply player state after htmx swaps in a new #player-state fragment.
+  document.addEventListener('htmx:afterSwap', e => {
+    if (e.detail.target?.id === 'player-state') applyCurrentState();
+  });
+
+  // htmx.ajax doesn't reject on HTTP errors — pause the player when /api/next fails.
+  document.addEventListener('htmx:responseError', e => {
+    if (e.detail.target?.id === 'player-state') state.player?.pause();
+  });
 });
 
 // ---- YouTube IFrame API bootstrap ----
@@ -106,31 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
 window.onYouTubeIframeAPIReady = ytApiLoaded;
 
 // startHere is called by the "Watch Here" button.
-window.startHere = async function () {
+window.startHere = function () {
   document.getElementById('start-screen').style.display = 'none';
   document.getElementById('player-wrapper').style.display = 'block';
-
-  const el = document.getElementById('player-state');
-  const sourceKind = el?.dataset.sourceKind || '';
-  const sourceId = el?.dataset.sourceId || '';
-  const streamURL = el?.dataset.streamUrl || '';
-  const position = parseFloat(el?.dataset.position) || 0;
-  const stopAt = parseFloat(el?.dataset.stopAt) || 0;
-
-  state.currentSource = { kind: sourceKind, id: sourceId };
-  state.currentStop = stopAt;
-
-  if (sourceKind === 'jellyfin') {
-    state.player = await createJellyfinBackend('player', streamURL, position, {
-      onEnded: advance,
-      onError: advance,
-    }).catch(() => null);
-  } else {
-    // youtube (and test fallback)
-    await ytReady;
-    state.player = await createYoutubeBackend('player', sourceId, position, {
-      onEnded: advance,
-      onError: advance,
-    });
-  }
+  applyCurrentState();
 };

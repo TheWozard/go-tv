@@ -8,10 +8,12 @@ export function initControls(state, advance, reportProgress) {
   const progressWrap = document.getElementById('progress-bar-wrap');
   const progressFill = document.getElementById('progress-bar-fill');
   const progressStop = document.getElementById('progress-bar-stop');
+  const skipMs = parseInt(document.getElementById('player-wrapper')?.dataset.skipIntervalMs, 10) || 10_000;
 
   // Cursor + progress bar visibility on mouse move.
-  const hideCursor   = debounce(() => { overlay.style.cursor = 'none'; }, 3000);
-  const hideProgress = debounce(() => progressWrap?.classList.remove('visible'), 3000);
+  const HIDE_DELAY_MS = 3000;
+  const hideCursor   = debounce(() => { overlay.style.cursor = 'none'; }, HIDE_DELAY_MS);
+  const hideProgress = debounce(() => progressWrap?.classList.remove('visible'), HIDE_DELAY_MS);
   overlay.addEventListener('mousemove', () => {
     overlay.style.cursor = 'default';
     hideCursor();
@@ -23,7 +25,7 @@ export function initControls(state, advance, reportProgress) {
   progressWrap?.addEventListener('click', e => {
     e.stopPropagation();
     if (!state.player) return;
-    const dur = state.player.getDuration?.() ?? 0;
+    const dur = state.player.getDuration();
     if (!dur) return;
     const rect = progressWrap.getBoundingClientRect();
     const pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -35,7 +37,7 @@ export function initControls(state, advance, reportProgress) {
   function tickProgress() {
     if (state.player) {
       const cur = state.player.getCurrentTime();
-      const dur = state.player.getDuration?.() ?? 0;
+      const dur = state.player.getDuration();
       if (dur > 0) {
         if (progressFill) {
           progressFill.style.width = ((cur / dur) * 100).toFixed(2) + '%';
@@ -80,7 +82,6 @@ export function initControls(state, advance, reportProgress) {
     } else if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') {
       e.preventDefault();
       if (!state.player) return;
-      const skipMs = parseInt(document.getElementById('player-wrapper')?.dataset.skipIntervalMs, 10) || 10_000;
       const dir = e.code === 'ArrowRight' ? 1 : -1;
       const newTime = state.player.getCurrentTime() + dir * (skipMs / 1000);
       state.player.seekTo(newTime);

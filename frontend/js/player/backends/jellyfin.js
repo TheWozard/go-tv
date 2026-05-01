@@ -6,37 +6,38 @@ import Hls from 'hls.js';
 export function createJellyfinBackend(elementId, streamURL, startSeconds, { onEnded, onError }) {
   const container = document.getElementById(elementId);
   const video = document.createElement('video');
-  video.autoplay = true;
   container.replaceChildren(video);
 
   return new Promise((resolve, reject) => {
-    function setup() {
+    function setup(hls) {
+      const backend = wrap(video, hls, onEnded, onError);
       video.currentTime = startSeconds;
-      video.play().catch(() => {});
+      backend.play();
       video.addEventListener('ended', onEnded);
       video.addEventListener('error', onError);
-      resolve(wrap(video));
+      resolve(backend);
     }
 
     if (Hls.isSupported()) {
       const hls = new Hls();
       hls.loadSource(streamURL);
       hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, setup);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => setup(hls));
       hls.on(Hls.Events.ERROR, (_, data) => { if (data.fatal) onError(); });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       // Safari native HLS
       video.src = streamURL;
-      video.addEventListener('loadedmetadata', setup, { once: true });
+      video.addEventListener('loadedmetadata', () => setup(null), { once: true });
     } else {
       reject(new Error('HLS not supported'));
     }
   });
 }
 
-function wrap(video) {
+function wrap(video, hls, onEnded, onError) {
+  const play = () => video.play().catch(() => {});
   return {
-    play()           { video.play().catch(() => {}); },
+    play,
     pause()          { video.pause(); },
     seekTo(s)        { video.currentTime = s; },
     getCurrentTime() { return video.currentTime; },
@@ -50,7 +51,14 @@ function wrap(video) {
       // For Jellyfin the stream URL encodes the item; a source change in
       // applyState will construct a new backend instead of calling loadVideo.
       video.currentTime = startSeconds;
-      video.play().catch(() => {});
+      play();
+    },
+    destroy() {
+      video.pause();
+      video.removeEventListener('ended', onEnded);
+      video.removeEventListener('error', onError);
+      hls?.destroy();
+      video.src = '';
     },
   };
 }

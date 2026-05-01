@@ -13,7 +13,7 @@ export function createYoutubeBackend(elementId, videoId, startSeconds, { onEnded
       videoId,
       playerVars: { start: Math.floor(startSeconds), autoplay: 1, controls: 0 },
       events: {
-        onReady() { resolve(wrap(ytPlayer, { onEnded, onError })); },
+        onReady() { resolve(wrap(ytPlayer)); },
         onStateChange(event) {
           if (event.data === YT.PlayerState.ENDED) onEnded();
         },
@@ -23,7 +23,7 @@ export function createYoutubeBackend(elementId, videoId, startSeconds, { onEnded
   });
 }
 
-function wrap(ytPlayer, { onEnded, onError }) {
+function wrap(ytPlayer) {
   return {
     play()               { ytPlayer.playVideo(); },
     pause()              { ytPlayer.pauseVideo(); },
@@ -41,5 +41,6 @@ function wrap(ytPlayer, { onEnded, onError }) {
     loadVideo(videoId, startSeconds) {
       ytPlayer.loadVideoById({ videoId, startSeconds: Math.floor(startSeconds) });
     },
+    destroy() { ytPlayer.destroy(); },
   };
 }
