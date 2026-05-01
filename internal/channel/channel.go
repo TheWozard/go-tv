@@ -1,6 +1,7 @@
 package channel
 
 import (
+	"context"
 	"errors"
 	"sort"
 	"time"
@@ -165,6 +166,22 @@ func (c *Channel) ApplyCuts(videoID string, cuts []CutRange) (*Video, error) {
 // SaveState persists the current playback state to disk.
 func (c *Channel) SaveState() error {
 	return c.state.Save()
+}
+
+// StartAutoSave saves state on interval until ctx is cancelled.
+func (c *Channel) StartAutoSave(ctx context.Context, interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				_ = c.state.Save()
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 }
 
 func makeSeg(start, end time.Duration) Segment {

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -47,6 +48,8 @@ func main() {
 	r.Use(middleware.Recoverer)
 	ch := channel.NewChannel(schedule, currentState)
 	api.OpenChannel(r, ch, cfg.Player, cfg.Jellyfin, logger)
+
+	ch.StartAutoSave(ctx, 10*time.Minute)
 
 	sub, err := fs.Sub(staticFiles, "static")
 	if err != nil {
