@@ -1,8 +1,8 @@
 {
   "private": true,
   "scripts": {
-    "build": "esbuild js/*.js css/*.css --bundle --platform=browser --format=iife --minify --outbase=. --outdir=static",
-    "watch": "esbuild js/*.js css/*.css --bundle --platform=browser --format=iife --outbase=. --outdir=static --watch"
+    "build": "esbuild frontend/js/*.js frontend/css/*.css --bundle --platform=browser --format=iife --minify --outbase=frontend --outdir=static",
+    "watch": "esbuild frontend/js/*.js frontend/css/*.css --bundle --platform=browser --format=iife --outbase=frontend --outdir=static --watch"
   },
   "dependencies": {
     "hls.js": "^1.6.16",

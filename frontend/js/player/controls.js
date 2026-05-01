@@ -3,7 +3,7 @@ import { debounce } from 'lodash-es';
 // initControls wires up the overlay and keyboard shortcuts.
 // state is a shared object { player, currentStop } mutated by player.js.
 // advance() is called when playback should move to the next video.
-export function initControls(state, advance) {
+export function initControls(state, advance, reportProgress) {
   const overlay = document.getElementById('overlay');
   const progressWrap = document.getElementById('progress-bar-wrap');
   const progressFill = document.getElementById('progress-bar-fill');
@@ -28,6 +28,7 @@ export function initControls(state, advance) {
     const rect = progressWrap.getBoundingClientRect();
     const pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     state.player.seekTo(pct * dur);
+    advance.cancel();
   });
 
   // rAF loop: update progress bar and check stop time at frame rate for accuracy.
@@ -51,6 +52,7 @@ export function initControls(state, advance) {
       if (state.currentStop > 0 && cur >= state.currentStop) {
         advance();
       }
+      reportProgress();
     }
     requestAnimationFrame(tickProgress);
   }
@@ -82,6 +84,7 @@ export function initControls(state, advance) {
       const dir = e.code === 'ArrowRight' ? 1 : -1;
       const newTime = state.player.getCurrentTime() + dir * (skipMs / 1000);
       state.player.seekTo(newTime);
+      advance.cancel();
       if (dir > 0 && state.currentStop > 0 && newTime >= state.currentStop) advance();
     }
   });

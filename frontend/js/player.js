@@ -1,3 +1,4 @@
+import { throttle } from 'lodash-es';
 import { postProgress, postNext } from './player/api.js';
 import { initControls } from './player/controls.js';
 import { createYoutubeBackend } from './player/backends/youtube.js';
@@ -23,11 +24,29 @@ function playingTime() {
   return state.player.getCurrentTime();
 }
 
-// advance moves to the next video, reporting the current position first.
-function advance() {
-  const seconds = state.player ? state.player.getCurrentTime() : 0;
-  postNext(state.currentSource, seconds);
-}
+const wrapper = document.getElementById('player-wrapper');
+const advanceRetryMs = parseInt(wrapper?.dataset.advanceRetryMs, 10) || 2000;
+const progressRateMs = parseInt(wrapper?.dataset.progressRateMs, 10) || 10000;
+
+// advance is throttled so rapid onEnded/onError fires collapse into one call.
+// Call advance.cancel() from controls to reset the window after user interaction.
+const advance = throttle(async () => {
+  try {
+    const seconds = state.player ? state.player.getCurrentTime() : 0;
+    await postNext(state.currentSource, seconds);
+    const el = document.getElementById('player-state');
+    if (el) applyStateFromEl(el);
+  } catch {
+    state.player?.pause();
+  }
+}, advanceRetryMs, { leading: true, trailing: false });
+
+// reportProgress throttles progress updates to progressRateMs while playing.
+// Called each rAF tick; trailing fires the last known position in each window.
+const reportProgress = throttle(() => {
+  const t = playingTime();
+  if (t !== null) postProgress(state.currentSource, t);
+}, progressRateMs, { leading: false, trailing: true });
 
 // applyState syncs the player to server state. If the source hasn't changed
 // it only seeks when positions are more than 5s apart (avoids seek loops).
@@ -35,7 +54,7 @@ function applyState(sourceKind, sourceId, seconds, stopSeconds, streamURL) {
   state.currentStop = stopSeconds;
 
   const sameSource = state.currentSource?.kind === sourceKind && state.currentSource?.id === sourceId;
-  const sameKind   = state.currentSource?.kind === sourceKind;
+  const sameKind = state.currentSource?.kind === sourceKind;
   state.currentSource = { kind: sourceKind, id: sourceId };
 
   if (sameSource) {
@@ -75,28 +94,11 @@ function applyStateFromEl(el) {
   );
 }
 
-// Re-sync whenever HTMX swaps in a new #player-state fragment.
-document.addEventListener('htmx:afterSwap', e => {
-  if (e.detail.target?.id !== 'player-state') return;
-  const el = document.getElementById('player-state');
-  if (el) applyStateFromEl(el);
-});
-
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('player-state');
   if (el) applyStateFromEl(el);
 
-  initControls(state, advance);
-
-  const wrapper = document.getElementById('player-wrapper');
-
-  // Progress report: keeps the server in sync with playback position.
-  const progressMs = parseInt(wrapper?.dataset.progressRateMs, 10) || 10000;
-  setInterval(() => {
-    const t = playingTime();
-    if (t === null) return;
-    postProgress(state.currentSource, t);
-  }, progressMs);
+  initControls(state, advance, reportProgress);
 });
 
 // ---- YouTube IFrame API bootstrap ----
@@ -110,10 +112,10 @@ window.startHere = async function () {
 
   const el = document.getElementById('player-state');
   const sourceKind = el?.dataset.sourceKind || '';
-  const sourceId   = el?.dataset.sourceId || '';
-  const streamURL  = el?.dataset.streamUrl || '';
-  const position   = parseFloat(el?.dataset.position) || 0;
-  const stopAt     = parseFloat(el?.dataset.stopAt) || 0;
+  const sourceId = el?.dataset.sourceId || '';
+  const streamURL = el?.dataset.streamUrl || '';
+  const position = parseFloat(el?.dataset.position) || 0;
+  const stopAt = parseFloat(el?.dataset.stopAt) || 0;
 
   state.currentSource = { kind: sourceKind, id: sourceId };
   state.currentStop = stopAt;
