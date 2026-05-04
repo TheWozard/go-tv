@@ -1,7 +1,7 @@
 // YouTube IFrame API backend.
 // Wraps YT.Player in the common player interface.
 
-export function createYoutubeBackend(elementId, videoId, startSeconds, { onEnded, onError }) {
+export function createYoutubeBackend(elementId, videoId, startSeconds, { onEnded, onError, onStateChange }) {
   // Create a fresh inner element so YT replaces it instead of #player itself,
   // keeping #player a stable <div> that Jellyfin can take over later.
   const container = document.getElementById(elementId);
@@ -15,7 +15,9 @@ export function createYoutubeBackend(elementId, videoId, startSeconds, { onEnded
       events: {
         onReady() { resolve(wrap(ytPlayer)); },
         onStateChange(event) {
-          if (event.data === YT.PlayerState.ENDED) onEnded();
+          if      (event.data === YT.PlayerState.ENDED)   onEnded();
+          else if (event.data === YT.PlayerState.PLAYING) onStateChange?.('playing');
+          else if (event.data === YT.PlayerState.PAUSED)  onStateChange?.('paused');
         },
         onError() { onError(); },
       },

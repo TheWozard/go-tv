@@ -36,8 +36,9 @@ func Load(path string) (*Config, error) {
 			Port: "8080",
 		},
 		Player: Player{
-			SkipInterval: Duration(10 * time.Second),
-			ProgressRate: Duration(10 * time.Second),
+			SkipInterval:    Duration(10 * time.Second),
+			ProgressRate:    Duration(10 * time.Second),
+			ResyncThreshold: Duration(60 * time.Second),
 		},
 		Logger: Logger{Level: "info"},
 	}

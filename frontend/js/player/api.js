@@ -19,3 +19,9 @@ export function postNext(source, seconds) {
     values: sourceParams(source, seconds),
   });
 }
+
+// getState fetches the current server state and swaps in a new #player-state
+// fragment. Used to resync the UI after the player has been paused or hidden.
+export function getState() {
+  return htmx.ajax('GET', '/api/state', { target: '#player-state', swap: 'outerHTML' });
+}

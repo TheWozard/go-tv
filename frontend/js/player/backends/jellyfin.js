@@ -3,18 +3,22 @@
 
 import Hls from 'hls.js';
 
-export function createJellyfinBackend(elementId, streamURL, startSeconds, { onEnded, onError }) {
+export function createJellyfinBackend(elementId, streamURL, startSeconds, { onEnded, onError, onStateChange }) {
   const container = document.getElementById(elementId);
   const video = document.createElement('video');
   container.replaceChildren(video);
 
   return new Promise((resolve, reject) => {
     function setup(hls) {
-      const backend = wrap(video, hls, onEnded, onError);
-      video.currentTime = startSeconds;
-      backend.play();
+      const onPlay  = () => onStateChange?.('playing');
+      const onPause = () => onStateChange?.('paused');
       video.addEventListener('ended', onEnded);
       video.addEventListener('error', onError);
+      video.addEventListener('play',  onPlay);
+      video.addEventListener('pause', onPause);
+      const backend = wrap(video, hls, { onEnded, onError, onPlay, onPause });
+      video.currentTime = startSeconds;
+      backend.play();
       resolve(backend);
     }
 
@@ -34,7 +38,7 @@ export function createJellyfinBackend(elementId, streamURL, startSeconds, { onEn
   });
 }
 
-function wrap(video, hls, onEnded, onError) {
+function wrap(video, hls, { onEnded, onError, onPlay, onPause }) {
   const play = () => video.play().catch(() => {});
   return {
     play,
@@ -55,8 +59,10 @@ function wrap(video, hls, onEnded, onError) {
     },
     destroy() {
       video.pause();
-      video.removeEventListener('ended', onEnded);
-      video.removeEventListener('error', onError);
+      video.removeEventListener('ended',  onEnded);
+      video.removeEventListener('error',  onError);
+      video.removeEventListener('play',   onPlay);
+      video.removeEventListener('pause',  onPause);
       hls?.destroy();
       video.src = '';
     },

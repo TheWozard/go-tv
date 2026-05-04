@@ -19,8 +19,21 @@ type PlayerHandler struct {
 }
 
 func (h *PlayerHandler) Mount(r chi.Router) {
+	r.Get("/state", h.stateHandler)
 	r.Post("/progress", h.progressHandler)
 	r.Post("/next", h.nextHandler)
+}
+
+func (h *PlayerHandler) stateHandler(w http.ResponseWriter, r *http.Request) {
+	source, position, stop, _ := h.channel.CurrentState()
+	streamURL := ""
+	if source.Kind == channel.SourceKindJellyfin {
+		streamURL = h.jellyfin.StreamURL(source.ID)
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := components.PlayerState(source, position, stop, streamURL).Render(r.Context(), w); err != nil {
+		h.logger.Error("render player state", err)
+	}
 }
 
 func (h *PlayerHandler) progressHandler(w http.ResponseWriter, r *http.Request) {

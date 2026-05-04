@@ -20,6 +20,7 @@ templ Player(source channel.Source, position, stopAt time.Duration, player confi
 				data-skip-interval-ms={ fmt.Sprintf("%d", player.SkipInterval.Duration().Milliseconds()) }
 				data-progress-rate-ms={ fmt.Sprintf("%d", player.ProgressRate.Duration().Milliseconds()) }
 				data-advance-retry-ms={ fmt.Sprintf("%d", player.AdvanceRetry.Duration().Milliseconds()) }
+				data-resync-threshold-ms={ fmt.Sprintf("%d", player.ResyncThreshold.Duration().Milliseconds()) }
 			>
 				<div id="player"></div>
 				<div id="overlay">

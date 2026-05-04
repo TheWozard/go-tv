@@ -1,5 +1,5 @@
 import { throttle } from 'lodash-es';
-import { postProgress, postNext } from './player/api.js';
+import { postProgress, postNext, getState } from './player/api.js';
 import { initControls } from './player/controls.js';
 import { createYoutubeBackend } from './player/backends/youtube.js';
 import { createJellyfinBackend } from './player/backends/jellyfin.js';
@@ -24,8 +24,9 @@ function playingTime() {
   return state.player.getCurrentTime();
 }
 
-const advanceRetryMs = parseInt(document.getElementById('player-wrapper')?.dataset.advanceRetryMs, 10) || 2000;
-const progressRateMs = parseInt(document.getElementById('player-wrapper')?.dataset.progressRateMs, 10) || 10000;
+const advanceRetryMs     = parseInt(document.getElementById('player-wrapper')?.dataset.advanceRetryMs, 10) || 2000;
+const progressRateMs     = parseInt(document.getElementById('player-wrapper')?.dataset.progressRateMs, 10) || 10000;
+const resyncThresholdMs  = parseInt(document.getElementById('player-wrapper')?.dataset.resyncThresholdMs, 10) || 60_000;
 
 // advance is throttled so rapid onEnded/onError fires collapse into one call.
 // Call advance.cancel() from controls to reset the window after user interaction.
@@ -62,7 +63,11 @@ function applyState(sourceKind, sourceId, seconds, stopSeconds, streamURL) {
   }
 
   // Source changed — cancel any pending advance and invalidate in-flight loads.
+  // Clear resync state; the new backend will re-arm it via onStateChange.
   advance.cancel();
+  clearTimeout(pauseTimer);
+  pauseTimer = null;
+  needsResync = false;
   const token = ++loadToken;
 
   // YouTube → YouTube: reuse the existing player, no tear-down needed.
@@ -76,15 +81,17 @@ function applyState(sourceKind, sourceId, seconds, stopSeconds, streamURL) {
   state.player = null;
   outgoing?.destroy();
 
+  const callbacks = { onEnded: advance, onError: advance, onStateChange };
+
   if (sourceKind === 'youtube') {
     ytReady
-      .then(() => createYoutubeBackend('player', sourceId, seconds, { onEnded: advance, onError: advance }))
+      .then(() => createYoutubeBackend('player', sourceId, seconds, callbacks))
       .then(backend => {
         if (token !== loadToken) { backend.destroy(); return; }
         state.player = backend;
       });
   } else if (sourceKind === 'jellyfin') {
-    createJellyfinBackend('player', streamURL, seconds, { onEnded: advance, onError: advance })
+    createJellyfinBackend('player', streamURL, seconds, callbacks)
       .then(backend => {
         if (token !== loadToken) { backend.destroy(); return; }
         state.player = backend;
@@ -106,6 +113,50 @@ function applyCurrentState() {
     el.dataset.streamUrl || '',
   );
 }
+
+// ---- Resync after UI pause ----
+//
+// Calls getState() to fetch the current backend position and swap in a new
+// #player-state fragment. applyCurrentState() fires via htmx:afterSwap and
+// seeks / switches source as needed.
+
+let hiddenAt    = 0;     // timestamp when page was last hidden
+let pauseTimer  = null;  // setTimeout handle; sets needsResync after threshold
+let needsResync = false; // true once pause threshold is reached; acted on next play
+
+function resync() {
+  needsResync = false;
+  hiddenAt = 0;
+  clearTimeout(pauseTimer);
+  pauseTimer = null;
+  getState();
+}
+
+// Called by each backend when playback state changes to 'playing' or 'paused'.
+function onStateChange(s) {
+  if (s === 'playing') {
+    clearTimeout(pauseTimer);
+    pauseTimer = null;
+    if (needsResync) resync();
+  } else if (pauseTimer === null && !needsResync) {
+    pauseTimer = setTimeout(() => {
+      pauseTimer = null;
+      needsResync = true;
+    }, resyncThresholdMs);
+  }
+}
+
+// Tab hidden/visible: resync immediately on restore if hidden longer than the
+// threshold. The video may already be playing so we can't wait for un-pause.
+// (Background tabs have throttled timers, so we check elapsed time on restore.)
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    hiddenAt = Date.now();
+  } else if (hiddenAt > 0) {
+    if (Date.now() - hiddenAt >= resyncThresholdMs) resync();
+    hiddenAt = 0;
+  }
+});
 
 document.addEventListener('DOMContentLoaded', () => {
   initControls(state, advance, reportProgress);
