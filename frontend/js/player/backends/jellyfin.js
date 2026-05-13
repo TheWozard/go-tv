@@ -10,13 +10,14 @@ export function createJellyfinBackend(elementId, streamURL, startSeconds, { onEn
 
   return new Promise((resolve, reject) => {
     function setup(hls) {
-      const onPlay  = () => onStateChange?.('playing');
-      const onPause = () => onStateChange?.('paused');
+      const onPlay       = () => onStateChange?.('playing');
+      const onPause      = () => onStateChange?.('paused');
+      const onVideoError = () => { console.error('[jellyfin] video error', video.error); onError(); };
       video.addEventListener('ended', onEnded);
-      video.addEventListener('error', onError);
+      video.addEventListener('error', onVideoError);
       video.addEventListener('play',  onPlay);
       video.addEventListener('pause', onPause);
-      const backend = wrap(video, hls, { onEnded, onError, onPlay, onPause });
+      const backend = wrap(video, hls, { onEnded, onError: onVideoError, onPlay, onPause });
       video.currentTime = startSeconds;
       backend.play();
       resolve(backend);
@@ -27,7 +28,7 @@ export function createJellyfinBackend(elementId, streamURL, startSeconds, { onEn
       hls.loadSource(streamURL);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => setup(hls));
-      hls.on(Hls.Events.ERROR, (_, data) => { if (data.fatal) onError(); });
+      hls.on(Hls.Events.ERROR, (_, data) => { if (data.fatal) { console.error('[jellyfin] hls fatal error', data.type, data.details, data); onError(); } });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       // Safari native HLS
       video.src = streamURL;

@@ -39,7 +39,7 @@ func (s *Server) Route(r chi.Router) {
 			stream := &StreamHandler{jellyfin: s.jellyfin, client: s.jellyfin.HTTPClient()}
 			stream.Mount(r)
 		}
-		r.Post("/schedule/reorder", s.scheduleReorderHandler)
+		r.Post("/series/reorder", s.scheduleReorderHandler)
 	})
 }
 
@@ -54,27 +54,28 @@ func (s *Server) playerHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) editHandler(w http.ResponseWriter, r *http.Request) {
 	source, position, _, _ := s.channel.CurrentState()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.Editor(s.channel.Playlists(), source, position, s.jellyfin.URL).Render(r.Context(), w); err != nil {
+	if err := components.Editor(s.channel.AllSeries(), source, position, s.jellyfin.URL).Render(r.Context(), w); err != nil {
 		s.logger.Error("render editor", err)
 	}
 }
 
 func (s *Server) scheduleReorderHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Items []struct {
-			Name     string   `json:"name"`
-			VideoIDs []string `json:"video_ids"`
-		} `json:"items"`
+		SeriesName string `json:"series_name"`
+		Seasons    []struct {
+			Name       string   `json:"name"`
+			EpisodeIDs []string `json:"episode_ids"`
+		} `json:"seasons"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	sets := make([]channel.ReorderSet, len(req.Items))
-	for i, item := range req.Items {
-		sets[i] = channel.ReorderSet{Name: item.Name, VideoIDs: item.VideoIDs}
+	orders := make([]channel.SeasonOrder, len(req.Seasons))
+	for i, s := range req.Seasons {
+		orders[i] = channel.SeasonOrder{Name: s.Name, EpisodeIDs: s.EpisodeIDs}
 	}
-	if err := s.channel.Reorder(sets); err != nil {
+	if err := s.channel.ReorderSeries(req.SeriesName, orders); err != nil {
 		http.Error(w, "failed to save", http.StatusInternalServerError)
 		return
 	}

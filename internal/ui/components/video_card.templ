@@ -18,7 +18,7 @@ func jumpVals(kind channel.SourceKind, id, seconds string) string {
 	return string(b)
 }
 
-templ VideoCard(v channel.Video, isActive bool, activeAt time.Duration, jellyfinBaseURL string) {
+templ VideoCard(v channel.Episode, isActive bool, activeAt time.Duration, jellyfinBaseURL string) {
 	{{ lenSecs := v.Length.Seconds() }}
 	{{ maxSecs := lenSecs; if maxSecs <= 0 { maxSecs = 600 } }}
 	<li

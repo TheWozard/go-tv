@@ -15,8 +15,8 @@ func dur(d time.Duration) *Duration { return &Duration{d} }
 
 func sec(n int) time.Duration { return time.Duration(n) * time.Second }
 
-func testVideo(segments ...Segment) Video {
-	return Video{
+func testEpisode(segments ...Segment) Episode {
+	return Episode{
 		Source:   NewTestSource("v1"),
 		Title:    "test",
 		Segments: segments,
@@ -37,10 +37,10 @@ func TestSegment_EndDuration(t *testing.T) {
 	assert.Equal(t, 30*time.Second, Segment{End: dur(30 * time.Second)}.EndDuration(def))
 }
 
-// Video.Current
+// Episode.Current
 
-func TestVideo_Current_NoSegments(t *testing.T) {
-	v := testVideo()
+func TestEpisode_Current_NoSegments(t *testing.T) {
+	v := testEpisode()
 
 	frag, ok := v.Current(0)
 	assert.True(t, ok)
@@ -52,8 +52,8 @@ func TestVideo_Current_NoSegments(t *testing.T) {
 	assert.False(t, ok, "at or past length should return false")
 }
 
-func TestVideo_Current_WithSegments(t *testing.T) {
-	v := testVideo(
+func TestEpisode_Current_WithSegments(t *testing.T) {
+	v := testEpisode(
 		Segment{End: dur(2 * time.Minute)},   // start=0, end=2:00
 		Segment{Start: dur(5 * time.Minute)}, // start=5:00, end=10:00
 	)
@@ -69,18 +69,18 @@ func TestVideo_Current_WithSegments(t *testing.T) {
 	assert.Equal(t, 5*time.Minute, frag.Start)
 }
 
-func TestVideo_Current_PastAllSegments(t *testing.T) {
-	v := testVideo(
+func TestEpisode_Current_PastAllSegments(t *testing.T) {
+	v := testEpisode(
 		Segment{Start: dur(5 * time.Minute), End: dur(8 * time.Minute)},
 	)
 	_, ok := v.Current(9 * time.Minute)
 	assert.False(t, ok, "position past all segment ends returns false")
 }
 
-// Video.Next
+// Episode.Next
 
-func TestVideo_Next_NoSegments(t *testing.T) {
-	v := testVideo()
+func TestEpisode_Next_NoSegments(t *testing.T) {
+	v := testEpisode()
 
 	frag, ok := v.Next(0)
 	assert.True(t, ok)
@@ -91,8 +91,8 @@ func TestVideo_Next_NoSegments(t *testing.T) {
 	assert.False(t, ok, "non-zero position with no segments returns false")
 }
 
-func TestVideo_Next_WithSegments(t *testing.T) {
-	v := testVideo(
+func TestEpisode_Next_WithSegments(t *testing.T) {
+	v := testEpisode(
 		Segment{End: dur(2 * time.Minute)},   // start=0
 		Segment{Start: dur(5 * time.Minute)}, // start=5m
 	)
@@ -111,11 +111,11 @@ func TestVideo_Next_WithSegments(t *testing.T) {
 	assert.False(t, ok)
 }
 
-// Video.Clean
+// Episode.Clean
 
-func TestVideo_Clean(t *testing.T) {
+func TestEpisode_Clean(t *testing.T) {
 	length := 10 * time.Minute
-	v := Video{
+	v := Episode{
 		Length: Duration{length},
 		Segments: []Segment{
 			{Start: dur(0), End: dur(length)},               // both redundant → dropped
@@ -131,12 +131,12 @@ func TestVideo_Clean(t *testing.T) {
 	assert.Nil(t, v.Segments[1].End)
 }
 
-// Video JSON round-trip
+// Episode JSON round-trip
 
-func TestVideo_JSON_RoundTrip(t *testing.T) {
-	v := Video{
+func TestEpisode_JSON_RoundTrip(t *testing.T) {
+	v := Episode{
 		Source: NewTestSource("abc"),
-		Title:  "Test Video",
+		Title:  "Test Episode",
 		Length: Duration{3*time.Minute + 30*time.Second},
 		Segments: []Segment{
 			{Start: dur(10 * time.Second), End: dur(2 * time.Minute)},
@@ -145,7 +145,7 @@ func TestVideo_JSON_RoundTrip(t *testing.T) {
 	data, err := json.Marshal(v)
 	require.NoError(t, err)
 
-	var decoded Video
+	var decoded Episode
 	require.NoError(t, json.Unmarshal(data, &decoded))
 	assert.True(t, v.Source.Equal(decoded.Source))
 	assert.Equal(t, v.Title, decoded.Title)
@@ -153,4 +153,16 @@ func TestVideo_JSON_RoundTrip(t *testing.T) {
 	require.Len(t, decoded.Segments, 1)
 	assert.Equal(t, 10*time.Second, decoded.Segments[0].Start.Duration)
 	assert.Equal(t, 2*time.Minute, decoded.Segments[0].End.Duration)
+}
+
+func TestEpisode_Continue_OmittedWhenFalse(t *testing.T) {
+	v := Episode{Source: NewTestSource("x"), Length: Duration{time.Minute}}
+	data, err := json.Marshal(v)
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), `"continue"`)
+
+	v.Continue = true
+	data, err = json.Marshal(v)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `"continue":true`)
 }

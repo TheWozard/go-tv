@@ -13,8 +13,8 @@ import (
 )
 
 type Config struct {
-	SchedulePath string    `yaml:"schedule"`
-	StatePath    string    `yaml:"state"`
+	SeriesDir string    `yaml:"series_dir"`
+	StatePath string    `yaml:"state"`
 	Tailscale    Tailscale `yaml:"tailscale"`
 	Server       Server    `yaml:"server"`
 	Player       Player    `yaml:"player"`
@@ -26,8 +26,8 @@ type Config struct {
 // If the file does not exist it returns the default config without error.
 func Load(path string) (*Config, error) {
 	cfg := &Config{
-		SchedulePath: "schedule.json",
-		StatePath:    "state.json",
+		SeriesDir: "./series",
+		StatePath: "state.json",
 		Tailscale: Tailscale{
 			Dir:  "/var/lib/tailscale",
 			Port: "443",

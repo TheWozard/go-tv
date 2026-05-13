@@ -2,18 +2,21 @@ package channel
 
 import "time"
 
-// Video is a single playable entry.
-type Video struct {
+// Episode is a single playable entry within a [Series].
+// When Continue is true and the episode ends, the next episode in the same
+// series is played automatically; otherwise a series is chosen at random.
+type Episode struct {
 	Source   Source    `json:"source"`
 	Title    string    `json:"title,omitempty"`
 	Segments []Segment `json:"segments,omitempty"`
 	Length   Duration  `json:"length"`
+	Continue bool      `json:"continue,omitempty"`
 }
 
-// Current returns the [Fragment] of the video that the position is a part of.
+// Current returns the [Fragment] of the episode that the position is a part of.
 // If the position is between [Fragments], the next Fragment is returned.
 // Returns false when position is after all [Fragments]
-func (v Video) Current(position time.Duration) (Fragment, bool) {
+func (v Episode) Current(position time.Duration) (Fragment, bool) {
 	if len(v.Segments) > 0 {
 		for _, seg := range v.Segments {
 			end := seg.EndDuration(v.Length.Duration)
@@ -35,11 +38,11 @@ func (v Video) Current(position time.Duration) (Fragment, bool) {
 	return Fragment{}, false
 }
 
-// Next returns the [Fragment] of the video that is next after the position.
+// Next returns the [Fragment] of the episode that is next after the position.
 // If the position is currently inside of a [Fragment], the next [Fragment] is returned.
 // Returns false when position is after the start of the last [Fragment] even if it is
 // before the end.
-func (v Video) Next(position time.Duration) (Fragment, bool) {
+func (v Episode) Next(position time.Duration) (Fragment, bool) {
 	if len(v.Segments) > 0 {
 		for _, seg := range v.Segments {
 			if seg.StartDuration() >= position {
@@ -61,8 +64,8 @@ func (v Video) Next(position time.Duration) (Fragment, bool) {
 }
 
 // Clean removes redundant start=0 and end=length values from segments,
-// then drops any segments that become empty. Modifies the video in place.
-func (v *Video) Clean() {
+// then drops any segments that become empty. Modifies the episode in place.
+func (v *Episode) Clean() {
 	var cleaned []Segment
 	for _, s := range v.Segments {
 		if s.Start != nil && s.Start.Duration == 0 {
@@ -78,7 +81,7 @@ func (v *Video) Clean() {
 	v.Segments = cleaned
 }
 
-// Segment defines a playback window within a video.
+// Segment defines a playback window within an episode.
 // Start/End are pointers so zero values (play from start / play to end) are omitted.
 type Segment struct {
 	Start *Duration `json:"start,omitempty"`
@@ -93,7 +96,7 @@ func (seg Segment) StartDuration() time.Duration {
 	return seg.Start.Duration
 }
 
-// EndDuration returns the segment's end, defaulting to def (typically the video length).
+// EndDuration returns the segment's end, defaulting to def (typically the episode length).
 func (seg Segment) EndDuration(def time.Duration) time.Duration {
 	if seg.End == nil {
 		return def

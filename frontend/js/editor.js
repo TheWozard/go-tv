@@ -7,10 +7,12 @@ function fmt(secs) {
 
 // SortableJS drag-and-drop
 function initSortable() {
-  Sortable.create(document.getElementById('video-list'), {
-    handle: '.set-item > .set-header > .handle',
-    animation: 150,
-    onEnd: saveOrder,
+  document.querySelectorAll('.series-seasons').forEach(ul => {
+    Sortable.create(ul, {
+      handle: '.set-item > .set-header > .handle',
+      animation: 150,
+      onEnd: saveOrder,
+    });
   });
 
   document.querySelectorAll('.set-videos').forEach(ul => {
@@ -24,19 +26,22 @@ function initSortable() {
 
 document.addEventListener('DOMContentLoaded', initSortable);
 document.addEventListener('htmx:afterSwap', e => {
-  if (e.target.id === 'video-list') initSortable();
+  if (e.target.id === 'series-list') initSortable();
 });
 
 function saveOrder() {
-  const items = [...document.querySelectorAll('#video-list > .set-item')].map(li => ({
-    name: li.querySelector('.set-name-input').value,
-    video_ids: [...li.querySelectorAll('.card')].map(c => c.dataset.id),
-  }));
-  fetch('/api/schedule/reorder', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items }),
-  }).catch(() => {});
+  document.querySelectorAll('#series-list > .series-item').forEach(seriesEl => {
+    const seriesName = seriesEl.dataset.seriesName;
+    const seasons = [...seriesEl.querySelectorAll(':scope > .series-seasons > .set-item')].map(li => ({
+      name: li.querySelector('.set-name-input').value,
+      episode_ids: [...li.querySelectorAll('.card')].map(c => c.dataset.id),
+    }));
+    fetch('/api/series/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ series_name: seriesName, seasons }),
+    }).catch(() => {});
+  });
 }
 
 // Position slider visual feedback — delegated, no global needed.

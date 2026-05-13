@@ -24,7 +24,7 @@ type EditorHandler struct {
 
 func (h *EditorHandler) Mount(r chi.Router) {
 	r.Post("/jump", h.jumpHandler)
-	r.Post("/schedule/rename", h.renameHandler)
+	r.Post("/series/rename", h.renameHandler)
 	r.Get("/sponsorblock/{videoID}", h.sbGetHandler)
 	r.Post("/sponsorblock/{videoID}", h.sbPostHandler)
 }
@@ -41,19 +41,20 @@ func (h *EditorHandler) jumpHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	activeSource, activeAt, _, _ := h.channel.CurrentState()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.VideoList(h.channel.Playlists(), activeSource, activeAt, h.jellyfin.URL).Render(r.Context(), w); err != nil {
+	if err := components.VideoList(h.channel.AllSeries(), activeSource, activeAt, h.jellyfin.URL).Render(r.Context(), w); err != nil {
 		h.logger.Error("render video list", err)
 	}
 }
 
 func (h *EditorHandler) renameHandler(w http.ResponseWriter, r *http.Request) {
+	seriesName := r.FormValue("series_name")
 	name := r.FormValue("name")
 	oldName := r.FormValue("old_name")
-	if name == "" || oldName == "" {
+	if seriesName == "" || name == "" || oldName == "" {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	if err := h.channel.RenamePlaylist(oldName, name); err != nil {
+	if err := h.channel.RenameSeason(seriesName, oldName, name); err != nil {
 		http.Error(w, "failed to save", http.StatusInternalServerError)
 		return
 	}

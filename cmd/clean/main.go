@@ -1,8 +1,8 @@
-// clean runs Video.Clean on all videos in the schedule and saves.
+// clean runs Episode.Clean on all episodes in every series and saves each file.
 //
 // Usage:
 //
-//	go run ./cmd/clean [-s schedule.json]
+//	go run ./cmd/clean [-d ./series]
 package main
 
 import (
@@ -15,26 +15,27 @@ import (
 )
 
 func main() {
-	schedPath := flag.String("s", "schedule.json", "path to schedule file")
+	seriesDir := flag.String("d", "./series", "path to series directory")
 	flag.Parse()
 
-	sched, err := channel.LoadSchedule(*schedPath)
+	sched, err := channel.LoadSeriesDir(*seriesDir)
 	if err != nil {
-		slog.Error("failed to load schedule", "err", err)
+		slog.Error("failed to load series dir", "err", err)
 		os.Exit(1)
 	}
 
-	items := sched.AllItems()
-	for i, item := range items {
-		for j := range item.Videos {
-			items[i].Videos[j].Clean()
+	for _, ser := range sched.AllSeries() {
+		seasons := ser.AllSeasons()
+		for i, season := range seasons {
+			for j := range season.Episodes {
+				seasons[i].Episodes[j].Clean()
+			}
 		}
+		ser.UpdateSeasons(seasons)
+		if err := ser.Save(); err != nil {
+			slog.Error("failed to save series", "name", ser.Name, "err", err)
+			os.Exit(1)
+		}
+		fmt.Printf("cleaned %s\n", ser.Name)
 	}
-
-	sched.Update(items)
-	if err := sched.Save(); err != nil {
-		slog.Error("failed to save schedule", "err", err)
-		os.Exit(1)
-	}
-	fmt.Printf("cleaned %s\n", *schedPath)
 }

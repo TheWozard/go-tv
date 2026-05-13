@@ -62,7 +62,7 @@ func TestState_SaveLoad(t *testing.T) {
 	dir := t.TempDir()
 	statePath := filepath.Join(dir, "state.json")
 
-	schedule := newTestSchedule(playlist("p1", "a", "b"))
+	schedule := newTestSchedule(makeSeries("p1", "a", "b"))
 	s := testState("b", 2*time.Minute)
 	s.SetFilePath(statePath)
 	require.NoError(t, s.Save())
@@ -74,7 +74,7 @@ func TestState_SaveLoad(t *testing.T) {
 }
 
 func TestLoadState_MissingFile(t *testing.T) {
-	schedule := newTestSchedule(playlist("p1", "a"))
+	schedule := newTestSchedule(makeSeries("p1", "a"))
 	s := channel.LoadState("/nonexistent/state.json", schedule)
 	source, pos := s.Get()
 	assert.Equal(t, "a", source.ID, "should fall back to first fragment")
@@ -86,7 +86,7 @@ func TestLoadState_InvalidJSON(t *testing.T) {
 	path := filepath.Join(dir, "state.json")
 	require.NoError(t, os.WriteFile(path, []byte(`{bad`), 0644))
 
-	sched := newTestSchedule(playlist("p1", "a"))
+	sched := newTestSchedule(makeSeries("p1", "a"))
 	s := channel.LoadState(path, sched)
 	source, _ := s.Get()
 	assert.Equal(t, "a", source.ID, "should fall back to first fragment")
@@ -102,7 +102,7 @@ func TestLoadState_VideoRemovedFromSchedule(t *testing.T) {
 	require.NoError(t, s.Save())
 
 	// Video not in schedule, falls back to first fragment.
-	sched := newTestSchedule(playlist("p1", "a"))
+	sched := newTestSchedule(makeSeries("p1", "a"))
 	loaded := channel.LoadState(path, sched)
 	source, pos := loaded.Get()
 	assert.Equal(t, "a", source.ID)

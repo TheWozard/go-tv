@@ -34,9 +34,9 @@ func main() {
 
 	logger := cfg.Logger.New()
 
-	schedule, err := channel.LoadSchedule(cfg.SchedulePath)
+	schedule, err := channel.LoadSeriesDir(cfg.SeriesDir)
 	if err != nil {
-		logger.Error("failed to load schedule", err)
+		logger.Error("failed to load series", err)
 		os.Exit(1)
 	}
 	currentState := channel.LoadState(cfg.StatePath, schedule)

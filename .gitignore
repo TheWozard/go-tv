@@ -20,6 +20,7 @@
 /*.txt
 !/package.json
 !/package-lock.json
+series/
 
 # generated favicon assets (regenerate with scripts/gen-favicon.sh)
 

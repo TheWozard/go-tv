@@ -103,6 +103,7 @@ function applyState(sourceKind, sourceId, seconds, stopSeconds, streamURL) {
 // ---- State observer ----
 
 function applyCurrentState() {
+  if (!started) return;
   const el = document.getElementById('player-state');
   if (!el) return;
   applyState(
@@ -120,6 +121,7 @@ function applyCurrentState() {
 // #player-state fragment. applyCurrentState() fires via htmx:afterSwap and
 // seeks / switches source as needed.
 
+let started     = false; // true once the user has clicked "Watch Here"
 let hiddenAt    = 0;     // timestamp when page was last hidden
 let pauseTimer  = null;  // setTimeout handle; sets needsResync after threshold
 let needsResync = false; // true once pause threshold is reached; acted on next play
@@ -180,5 +182,6 @@ window.onYouTubeIframeAPIReady = ytApiLoaded;
 window.startHere = function () {
   document.getElementById('start-screen').style.display = 'none';
   document.getElementById('player-wrapper').style.display = 'block';
+  started = true;
   applyCurrentState();
 };

@@ -8,8 +8,9 @@ import (
 )
 
 var (
-	ErrVideoNotInSchedule = errors.New("video not in schedule")
-	ErrNoNextFragment     = errors.New("no next fragment")
+	ErrEpisodeNotInSchedule = errors.New("episode not in schedule")
+	ErrSeriesNotFound       = errors.New("series not found")
+	ErrNoNextFragment       = errors.New("no next fragment")
 )
 
 // Channel coordinates schedule and state for a single channel.
@@ -33,22 +34,28 @@ func (c *Channel) CurrentState() (source Source, position, stopAt time.Duration,
 	return frag.Source, frag.Start, frag.End, ok
 }
 
-// Playlists returns all playlists in the schedule.
-func (c *Channel) Playlists() []Playlist {
-	return c.schedule.AllItems()
+// AllSeries returns all series in the schedule.
+func (c *Channel) AllSeries() []*Series {
+	return c.schedule.AllSeries()
 }
 
 // Progress records playback position. Ignored if source is stale.
 func (c *Channel) Progress(source Source, position time.Duration) {
 	c.state.SetPosition(source, position)
+	if ser := c.schedule.SeriesOf(source); ser != nil {
+		ser.UpdateState(source, position)
+	}
 }
 
 // Jump unconditionally moves playback to source at position.
 func (c *Channel) Jump(source Source, position time.Duration) error {
 	if _, ok := c.schedule.Find(source); !ok {
-		return ErrVideoNotInSchedule
+		return ErrEpisodeNotInSchedule
 	}
 	c.state.Jump(source, position)
+	if ser := c.schedule.SeriesOf(source); ser != nil {
+		ser.JumpState(source, position)
+	}
 	return nil
 }
 
@@ -59,60 +66,76 @@ func (c *Channel) Next(source Source, position time.Duration) error {
 		return ErrNoNextFragment
 	}
 	c.state.Advance(source, frag.Source, frag.Start)
+	if ser := c.schedule.SeriesOf(frag.Source); ser != nil {
+		ser.JumpState(frag.Source, frag.Start)
+	}
 	return nil
 }
 
-// RenamePlaylist renames the playlist identified by oldName.
-func (c *Channel) RenamePlaylist(oldName, newName string) error {
-	items := c.schedule.AllItems()
-	for i, it := range items {
-		if it.Name == oldName {
-			items[i].Name = newName
+// RenameSeason renames a season within the named series.
+func (c *Channel) RenameSeason(seriesName, oldName, newName string) error {
+	ser := c.schedule.FindSeries(seriesName)
+	if ser == nil {
+		return ErrSeriesNotFound
+	}
+	seasons := ser.AllSeasons()
+	for i, s := range seasons {
+		if s.Name == oldName {
+			seasons[i].Name = newName
 			break
 		}
 	}
-	c.schedule.Update(items)
-	return c.schedule.Save()
+	ser.UpdateSeasons(seasons)
+	return ser.Save()
 }
 
-// ReorderSet describes a playlist's desired video ordering.
-type ReorderSet struct {
-	Name     string
-	VideoIDs []string
+// SeasonOrder describes a season's desired episode ordering.
+type SeasonOrder struct {
+	Name       string
+	EpisodeIDs []string
 }
 
-// Reorder updates playlist order and saves.
-func (c *Channel) Reorder(sets []ReorderSet) error {
-	existing := make(map[string]Video)
-	for _, v := range c.schedule.All() {
-		existing[v.Source.ID] = v
+// ReorderSeries updates the season and episode order within a series and saves.
+func (c *Channel) ReorderSeries(seriesName string, orders []SeasonOrder) error {
+	ser := c.schedule.FindSeries(seriesName)
+	if ser == nil {
+		return ErrSeriesNotFound
 	}
-	items := make([]Playlist, len(sets))
-	for i, s := range sets {
-		videos := make([]Video, 0, len(s.VideoIDs))
-		for _, id := range s.VideoIDs {
-			if v, ok := existing[id]; ok {
-				videos = append(videos, v)
+
+	existing := make(map[string]Episode)
+	for _, season := range ser.AllSeasons() {
+		for _, ep := range season.Episodes {
+			existing[ep.Source.ID] = ep
+		}
+	}
+
+	seasons := make([]Season, len(orders))
+	for i, o := range orders {
+		episodes := make([]Episode, 0, len(o.EpisodeIDs))
+		for _, id := range o.EpisodeIDs {
+			if ep, ok := existing[id]; ok {
+				episodes = append(episodes, ep)
 			}
 		}
-		items[i] = Playlist{Name: s.Name, Videos: videos}
+		seasons[i] = Season{Name: o.Name, Episodes: episodes}
 	}
-	c.schedule.Update(items)
-	return c.schedule.Save()
+	ser.UpdateSeasons(seasons)
+	c.schedule.rebuildIndex()
+	return ser.Save()
 }
 
-// CutRange is a time range to remove from a video.
+// CutRange is a time range to remove from an episode.
 type CutRange struct {
 	Start time.Duration
 	End   time.Duration
 }
 
 // ApplyCuts converts cut ranges into keep-segments, updates the schedule, and saves.
-// Returns the updated Video or an error if the video is not found or save fails.
-func (c *Channel) ApplyCuts(videoID string, cuts []CutRange) (*Video, error) {
-	video, ok := c.schedule.Find(NewYoutubeSource(videoID))
+// Returns the updated Episode or an error if the episode is not found or save fails.
+func (c *Channel) ApplyCuts(videoID string, cuts []CutRange) (*Episode, error) {
+	episode, ok := c.schedule.Find(NewYoutubeSource(videoID))
 	if !ok {
-		return nil, ErrVideoNotInSchedule
+		return nil, ErrEpisodeNotInSchedule
 	}
 
 	const minDur = 10 * time.Second
@@ -138,34 +161,50 @@ func (c *Channel) ApplyCuts(videoID string, cuts []CutRange) (*Video, error) {
 			}
 			pos = cut.End
 		}
-		if video.Length.Duration-pos >= minDur {
-			newSegments = append(newSegments, makeSeg(pos, video.Length.Duration))
+		if episode.Length.Duration-pos >= minDur {
+			newSegments = append(newSegments, makeSeg(pos, episode.Length.Duration))
 		}
-		v := &Video{Segments: newSegments, Length: video.Length}
+		v := &Episode{Segments: newSegments, Length: episode.Length}
 		v.Clean()
 		newSegments = v.Segments
 	}
 
-	items := c.schedule.AllItems()
-	for i, item := range items {
-		for j, v := range item.Videos {
-			if v.Source.ID == videoID {
-				items[i].Videos[j].Segments = newSegments
+	// Find the series that contains this episode and update it.
+	for _, ser := range c.schedule.AllSeries() {
+		seasons := ser.AllSeasons()
+		changed := false
+		for i, season := range seasons {
+			for j, ep := range season.Episodes {
+				if ep.Source.ID == videoID {
+					seasons[i].Episodes[j].Segments = newSegments
+					changed = true
+				}
 			}
 		}
-	}
-	c.schedule.Update(items)
-	if err := c.schedule.Save(); err != nil {
-		return nil, err
+		if changed {
+			ser.UpdateSeasons(seasons)
+			if err := ser.Save(); err != nil {
+				return nil, err
+			}
+			break
+		}
 	}
 
 	updated, _ := c.schedule.Find(NewYoutubeSource(videoID))
 	return updated, nil
 }
 
-// SaveState persists the current playback state to disk.
+// SaveState persists the current playback state and all per-series states to disk.
 func (c *Channel) SaveState() error {
-	return c.state.Save()
+	if err := c.state.Save(); err != nil {
+		return err
+	}
+	for _, ser := range c.schedule.AllSeries() {
+		if err := ser.SaveState(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // StartAutoSave saves state on interval until ctx is cancelled.
@@ -177,6 +216,9 @@ func (c *Channel) StartAutoSave(ctx context.Context, interval time.Duration) {
 			select {
 			case <-ticker.C:
 				_ = c.state.Save()
+				for _, ser := range c.schedule.AllSeries() {
+					_ = ser.SaveState()
+				}
 			case <-ctx.Done():
 				return
 			}
@@ -196,4 +238,3 @@ func makeSeg(start, end time.Duration) Segment {
 	}
 	return seg
 }
-

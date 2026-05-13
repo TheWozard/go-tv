@@ -1,4 +1,5 @@
-// append-jellyfin searches a Jellyfin server and appends selected items to a schedule.
+// append-jellyfin searches a Jellyfin server and creates a new series file
+// in the series directory from the selected items.
 //
 // Usage:
 //
@@ -6,9 +7,9 @@
 //
 // Flags:
 //
-//	-config    path to config file (default: config.yaml)
-//	-schedule  path to schedule file (default: schedule.json)
-//	-limit     max search results to display (default: 20)
+//	-config  path to config file (default: config.yaml)
+//	-d       path to series directory (default: ./series)
+//	-limit   max search results to display (default: 20)
 package main
 
 import (
@@ -20,6 +21,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -29,13 +32,13 @@ import (
 )
 
 type jfItem struct {
-	ID           string `json:"Id"`
-	Name         string `json:"Name"`
-	Type         string `json:"Type"`
-	RunTimeTicks *int64 `json:"RunTimeTicks"` // 100ns ticks; nil when unknown
-	SeriesName   string `json:"SeriesName"`   // non-empty for Episodes
-	ParentIndexNumber *int `json:"ParentIndexNumber"` // season number
-	IndexNumber       *int `json:"IndexNumber"`       // episode number
+	ID                string `json:"Id"`
+	Name              string `json:"Name"`
+	Type              string `json:"Type"`
+	RunTimeTicks      *int64 `json:"RunTimeTicks"` // 100ns ticks; nil when unknown
+	SeriesName        string `json:"SeriesName"`   // non-empty for Episodes
+	ParentIndexNumber *int   `json:"ParentIndexNumber"` // season number
+	IndexNumber       *int   `json:"IndexNumber"`       // episode number
 }
 
 func (item jfItem) displayTitle() string {
@@ -59,9 +62,17 @@ func (item jfItem) duration() channel.Duration {
 	return channel.Duration{Duration: time.Duration(*item.RunTimeTicks * 100).Truncate(time.Second)}
 }
 
+var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
+
+func slugify(s string) string {
+	s = strings.ToLower(s)
+	s = nonAlnum.ReplaceAllString(s, "_")
+	return strings.Trim(s, "_")
+}
+
 func main() {
 	configPath := flag.String("config", "config.yaml", "path to config file")
-	schedPath := flag.String("schedule", "schedule.json", "path to schedule file")
+	seriesDir := flag.String("d", "./series", "path to series directory")
 	limit := flag.Int("limit", 20, "max results to show")
 	flag.Parse()
 
@@ -101,23 +112,15 @@ func main() {
 		return
 	}
 
-	sched, err := channel.LoadSchedule(*schedPath)
-	if os.IsNotExist(err) {
-		sched = channel.NewSchedule(*schedPath)
-	} else if err != nil {
-		slog.Error("failed to load schedule", "err", err)
-		os.Exit(1)
-	}
-
-	videos := make([]channel.Video, 0, len(selected))
+	episodes := make([]channel.Episode, 0, len(selected))
 	for _, idx := range selected {
 		item := items[idx]
-		v := channel.Video{
+		ep := channel.Episode{
 			Source: channel.NewJellyfinSource(item.ID),
 			Title:  item.displayTitle(),
 			Length: item.duration(),
 		}
-		videos = append(videos, v)
+		episodes = append(episodes, ep)
 		fmt.Printf("  + %s  %s\n", item.ID, item.displayTitle())
 	}
 
@@ -126,14 +129,19 @@ func main() {
 		name = query
 	}
 
-	sched.Update(append(sched.AllItems(), channel.Playlist{Name: name, Videos: videos}))
-	fmt.Printf("added %q (%d video(s))\n", name, len(videos))
-
-	if err := sched.Save(); err != nil {
-		slog.Error("failed to save schedule", "err", err)
+	if err := os.MkdirAll(*seriesDir, 0755); err != nil {
+		slog.Error("failed to create series dir", "err", err)
 		os.Exit(1)
 	}
-	fmt.Printf("appended to %s\n", *schedPath)
+
+	path := filepath.Join(*seriesDir, slugify(name)+".json")
+	season := channel.Season{Name: name, Episodes: episodes}
+	ser := channel.NewSeries(path, name, season)
+	if err := ser.Save(); err != nil {
+		slog.Error("failed to save series", "err", err)
+		os.Exit(1)
+	}
+	fmt.Printf("created series %q (%d episode(s)) → %s\n", name, len(episodes), path)
 }
 
 func search(jf config.Jellyfin, query string, limit int) []jfItem {
@@ -173,7 +181,6 @@ func search(jf config.Jellyfin, query string, limit int) []jfItem {
 }
 
 // prompt asks the user to pick results and returns 0-based indices.
-// Accepts: "all", a single number, or a comma-separated list like "1,3,5".
 func prompt(total int) []int {
 	fmt.Printf("\nselect [1-%d], comma-separated, or 'all': ", total)
 	scanner := bufio.NewScanner(os.Stdin)

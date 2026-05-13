@@ -49,10 +49,13 @@ func LoadState(path string, schedule *Schedule) *State {
 	return first.toState(path)
 }
 
-// Save persists the current state to disk.
+// Save persists the current state to disk. No-op if no path is configured.
 func (s *State) Save() (err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	if s.path == "" {
+		return nil
+	}
 	f, err := os.Create(s.path)
 	if err != nil {
 		return err

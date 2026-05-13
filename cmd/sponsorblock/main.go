@@ -1,5 +1,5 @@
 // sponsorblock fetches segments from SponsorBlock for a video and updates
-// the schedule. Each selected segment splits the video's playback, creating
+// the series. Each selected segment splits the video's playback, creating
 // gaps where skipped content lives. Segments shorter than -min are discarded.
 //
 // Usage:
@@ -8,9 +8,9 @@
 //
 // Flags:
 //
-//	-schedule  path to schedule file (default: schedule.json)
-//	-min       minimum segment duration to keep (default: 10s)
-//	-apply     pre-select segments (comma-separated numbers, or 'all')
+//	-d     path to series directory (default: ./series)
+//	-min   minimum segment duration to keep (default: 10s)
+//	-apply pre-select segments (comma-separated numbers, or 'all')
 package main
 
 import (
@@ -29,7 +29,7 @@ import (
 )
 
 func main() {
-	schedPath := flag.String("s", "schedule.json", "path to schedule file")
+	seriesDir := flag.String("d", "./series", "path to series directory")
 	minDur := flag.Duration("m", 10*time.Second, "minimum segment duration to keep")
 	apply := flag.String("a", "", "segments to apply (comma-separated numbers, or 'all')")
 	cats := flag.String("c", "", "categories to fetch (comma-separated; default: all)")
@@ -41,9 +41,9 @@ func main() {
 	}
 	videoID := flag.Arg(0)
 
-	sched, err := channel.LoadSchedule(*schedPath)
+	sched, err := channel.LoadSeriesDir(*seriesDir)
 	if err != nil {
-		slog.Error("failed to load schedule", "err", err)
+		slog.Error("failed to load series dir", "err", err)
 		os.Exit(1)
 	}
 
@@ -116,7 +116,7 @@ func main() {
 	// Find the video's length from the schedule.
 	video, ok := sched.Find(channel.NewYoutubeSource(videoID))
 	if !ok {
-		fmt.Fprintf(os.Stderr, "video %s not found in schedule\n", videoID)
+		fmt.Fprintf(os.Stderr, "video %s not found in series dir\n", videoID)
 		os.Exit(1)
 	}
 	videoLength := video.Length.Duration
@@ -151,7 +151,7 @@ func main() {
 		}
 
 		// Clean up redundant values and empty segments.
-		v := &channel.Video{Segments: newSegments, Length: video.Length}
+		v := &channel.Episode{Segments: newSegments, Length: video.Length}
 		v.Clean()
 		newSegments = v.Segments
 	}
@@ -174,22 +174,28 @@ func main() {
 		}
 	}
 
-	// Update schedule.
-	items := sched.AllItems()
-	for i, item := range items {
-		for j, v := range item.Videos {
-			if v.Source.ID == videoID {
-				items[i].Videos[j].Segments = newSegments
+	// Update the series file that contains this episode.
+	for _, ser := range sched.AllSeries() {
+		seasons := ser.AllSeasons()
+		changed := false
+		for i, season := range seasons {
+			for j, ep := range season.Episodes {
+				if ep.Source.ID == videoID {
+					seasons[i].Episodes[j].Segments = newSegments
+					changed = true
+				}
 			}
 		}
+		if changed {
+			ser.UpdateSeasons(seasons)
+			if err := ser.Save(); err != nil {
+				slog.Error("failed to save series", "name", ser.Name, "err", err)
+				os.Exit(1)
+			}
+			fmt.Printf("\nsaved to %s\n", ser.Name)
+			return
+		}
 	}
-
-	sched.Update(items)
-	if err := sched.Save(); err != nil {
-		slog.Error("failed to save schedule", "err", err)
-		os.Exit(1)
-	}
-	fmt.Printf("\nsaved to %s\n", *schedPath)
 }
 
 func makeSegment(start, end time.Duration) channel.Segment {

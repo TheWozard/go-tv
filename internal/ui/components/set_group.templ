@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-templ SetGroup(set channel.Playlist, active channel.Source, activeAt time.Duration, jellyfinBaseURL string) {
-	{{ isActiveSet := false; for _, v := range set.Videos { if v.Source.Equal(active) { isActiveSet = true; break } } }}
+templ SetGroup(set channel.Season, seriesName string, active channel.Source, activeAt time.Duration, jellyfinBaseURL string) {
+	{{ isActiveSet := false; for _, ep := range set.Episodes { if ep.Source.Equal(active) { isActiveSet = true; break } } }}
 	<li class={ "set-item collapsed", templ.KV("active-set", isActiveSet) }>
 		<div class="set-header">
 			<div class="handle text-faint" title="drag to reorder">⠿</div>
@@ -16,17 +16,18 @@ templ SetGroup(set channel.Playlist, active channel.Source, activeAt time.Durati
 				type="text"
 				name="name"
 				value={ set.Name }
-				hx-post="/api/schedule/rename"
+				hx-post="/api/series/rename"
 				hx-trigger="input changed delay:800ms"
-				hx-include="next [name='old_name']"
+				hx-include="next [name='old_name'], next [name='series_name']"
 				hx-swap="none"
 				hx-on::after-request="if(event.detail.successful) this.nextElementSibling.value=this.value"
 			/>
 			<input type="hidden" name="old_name" value={ set.Name }/>
+			<input type="hidden" name="series_name" value={ seriesName }/>
 		</div>
 		<ul class="set-videos" id={ "set-videos-" + set.Name }>
-			for _, v := range set.Videos {
-				@VideoCard(v, v.Source.Equal(active), activeAt, jellyfinBaseURL)
+			for _, ep := range set.Episodes {
+				@VideoCard(ep, ep.Source.Equal(active), activeAt, jellyfinBaseURL)
 			}
 		</ul>
 	</li>
