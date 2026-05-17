@@ -9,46 +9,35 @@ const (
 	SourceKindJellyfin SourceKind = "jellyfin"
 )
 
-// newSource creates a source with the given kind and ID.
-func newSource(kind SourceKind, id string) Source {
-	return Source{Kind: kind, ID: id}
-}
-
-// NewValidatedSource creates a source after checking that kind is recognized
-// and id is non-empty. Returns false if either check fails.
-func NewValidatedSource(kind SourceKind, id string) (Source, bool) {
-	if id == "" {
-		return Source{}, false
-	}
-	switch kind {
-	case SourceKindYoutube, SourceKindTest, SourceKindJellyfin:
-		return newSource(kind, id), true
-	default:
-		return Source{}, false
-	}
-}
-
 func NewTestSource(id string) Source {
-	return newSource(SourceKindTest, id)
+	return Source{kind: SourceKindTest, id: id}
 }
 
 func NewYoutubeSource(id string) Source {
-	return newSource(SourceKindYoutube, id)
+	return Source{kind: SourceKindYoutube, id: id}
 }
 
 func NewJellyfinSource(id string) Source {
-	return newSource(SourceKindJellyfin, id)
+	return Source{kind: SourceKindJellyfin, id: id}
 }
 
-// Source identifies a video on a specific platform.
-// It serializes to JSON in two formats: a bare string "id" (legacy, assumes
-// YouTube) or an object {"kind":"youtube","id":"..."}.
 type Source struct {
-	Kind SourceKind `json:"kind"`
-	ID   string     `json:"id"`
+	kind SourceKind
+	id   string
 }
 
-// Equal reports whether two sources refer to the same video.
+func (s Source) GetKind() SourceKind {
+	return s.kind
+}
+
+func (s Source) GetID() string {
+	return s.id
+}
+
 func (s Source) Equal(o Source) bool {
-	return s.Kind == o.Kind && s.ID == o.ID
+	return s.kind == o.kind && s.id == o.id
+}
+
+func (s Source) IsZero() bool {
+	return s.id == ""
 }

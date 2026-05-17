@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-templ VideoList(series []*channel.Series, active channel.Source, activeAt time.Duration, jellyfinBaseURL string) {
+templ VideoList(series []*channel.Series, state *channel.State, active channel.Source, activeAt time.Duration, jellyfinBaseURL string) {
 	if len(series) == 0 {
 		<ul id="series-list">
 			<li id="status" class="text-muted">No series loaded.</li>
@@ -13,27 +13,28 @@ templ VideoList(series []*channel.Series, active channel.Source, activeAt time.D
 	} else {
 		<ul id="series-list">
 			for _, ser := range series {
-				@SeriesSection(ser, active, activeAt, jellyfinBaseURL)
+				@SeriesSection(ser, state, active, activeAt, jellyfinBaseURL)
 			}
 		</ul>
 	}
 }
 
-templ SeriesSection(ser *channel.Series, active channel.Source, activeAt time.Duration, jellyfinBaseURL string) {
+templ SeriesSection(ser *channel.Series, state *channel.State, active channel.Source, activeAt time.Duration, jellyfinBaseURL string) {
 	{{ isActiveSeries := false; for _, season := range ser.Seasons { for _, ep := range season.Episodes { if ep.Source.Equal(active) { isActiveSeries = true; break } } } }}
-	<li class={ "series-item", templ.KV("active-series", isActiveSeries) } data-series-name={ ser.Name }>
+	{{ stateSource, stateAt := state.GetSeriesState(ser.ID()) }}
+	<li class={ "series-item", templ.KV("active-series", isActiveSeries) } data-series-name={ ser.ID() }>
 		<div class="series-header">
 			<span class="series-title">{ ser.Name }</span>
 		</div>
-		<ul class="series-seasons" id={ "series-seasons-" + ser.Name }>
+		<ul class="series-seasons" id={ "series-seasons-" + ser.ID() }>
 			for _, season := range ser.Seasons {
-				@SetGroup(season, ser.Name, active, activeAt, jellyfinBaseURL)
+				@SetGroup(season, ser.ID(), active, activeAt, stateSource, stateAt, jellyfinBaseURL)
 			}
 		</ul>
 	</li>
 }
 
-templ Editor(series []*channel.Series, active channel.Source, activeAt time.Duration, jellyfinBaseURL string) {
+templ Editor(series []*channel.Series, state *channel.State, active channel.Source, activeAt time.Duration, jellyfinBaseURL string) {
 	@Layout("go-tv / edit", "editor") {
 		<body class="editor">
 			<header>
@@ -42,7 +43,7 @@ templ Editor(series []*channel.Series, active channel.Source, activeAt time.Dura
 					<a href="/">Resume</a>
 				</nav>
 			</header>
-			@VideoList(series, active, activeAt, jellyfinBaseURL)
+			@VideoList(series, state, active, activeAt, jellyfinBaseURL)
 		</body>
 	}
 }

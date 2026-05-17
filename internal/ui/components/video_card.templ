@@ -18,7 +18,7 @@ func jumpVals(kind channel.SourceKind, id, seconds string) string {
 	return string(b)
 }
 
-templ VideoCard(v channel.Episode, isActive bool, activeAt time.Duration, jellyfinBaseURL string) {
+templ VideoCard(v channel.Episode, isActive bool, activeAt time.Duration, stateSource channel.Source, stateAt time.Duration, jellyfinBaseURL string) {
 	{{ lenSecs := v.Length.Seconds() }}
 	{{ maxSecs := lenSecs; if maxSecs <= 0 { maxSecs = 600 } }}
 	<li
@@ -66,8 +66,8 @@ templ VideoCard(v channel.Episode, isActive bool, activeAt time.Duration, jellyf
 			<div class="segs-bar">
 				<div class="segs-bar-track">
 					for _, seg := range v.Segments {
-						{{ start := 0.0; if seg.Start != nil { start = seg.Start.Seconds() } }}
-						{{ end := lenSecs; if seg.End != nil { end = seg.End.Seconds() } }}
+						{{ start := seg.Start.Seconds() }}
+						{{ end := lenSecs; if seg.End != 0 { end = seg.End.Seconds() } }}
 						if lenSecs > 0 {
 							<div
 								class="seg-chunk"
@@ -113,6 +113,33 @@ templ VideoCard(v channel.Episode, isActive bool, activeAt time.Duration, jellyf
 					<div class="times text-muted">
 						<span>Now Playing</span>
 						<span class="pos-display">{ fmtSecs(activeSecs) }</span>
+					</div>
+				</div>
+			} else if v.Source.Equal(stateSource) {
+				{{ savedSecs := stateAt.Seconds() }}
+				<div class="pos-wrap saved">
+					<div class="pos-slider-wrap">
+						<div
+							class="pos-fill"
+							style={ fmt.Sprintf("width:%.2f%%", savedSecs/maxSecs*100) }
+						></div>
+						<input
+							class="pos-range"
+							type="range"
+							min="0"
+							max={ fmt.Sprintf("%g", maxSecs) }
+							step="1"
+							value={ fmt.Sprintf("%g", savedSecs) }
+							name="seconds"
+							hx-post="/api/jump"
+							hx-trigger="change"
+							hx-swap="none"
+							hx-vals={ jumpVals(v.Source.Kind, v.Source.ID, "") }
+						/>
+					</div>
+					<div class="times text-muted">
+						<span>Saved</span>
+						<span class="pos-display">{ fmtSecs(savedSecs) }</span>
 					</div>
 				</div>
 			}

@@ -17,3 +17,7 @@ Bug
 Incomplete
 - [ ] ApplyCuts only works for YouTube — Jellyfin videos have no cut/SponsorBlock support
 - [ ] No input validation on cut start/end values — negative or out-of-range floats accepted silently
+
+Tech Debt
+- [ ] Pregen ID
+- [ ] fix seriesStateName

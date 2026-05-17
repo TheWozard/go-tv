@@ -11,20 +11,21 @@ import (
 	"log/slog"
 	"os"
 
-	"go-tv/internal/channel"
+	"go-tv/internal/store"
 )
 
 func main() {
 	seriesDir := flag.String("d", "./series", "path to series directory")
 	flag.Parse()
 
-	sched, err := channel.LoadSeriesDir(*seriesDir)
+	serFiles, err := store.LoadSeriesDir(*seriesDir)
 	if err != nil {
 		slog.Error("failed to load series dir", "err", err)
 		os.Exit(1)
 	}
 
-	for _, ser := range sched.AllSeries() {
+	for _, sf := range serFiles {
+		ser := sf.Series
 		seasons := ser.AllSeasons()
 		for i, season := range seasons {
 			for j := range season.Episodes {
@@ -32,7 +33,7 @@ func main() {
 			}
 		}
 		ser.UpdateSeasons(seasons)
-		if err := ser.Save(); err != nil {
+		if err := store.SaveSeries(sf.Path, ser); err != nil {
 			slog.Error("failed to save series", "name", ser.Name, "err", err)
 			os.Exit(1)
 		}

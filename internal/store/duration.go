@@ -1,4 +1,4 @@
-package channel
+package store
 
 import (
 	"encoding/json"
@@ -27,3 +27,6 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 func (d Duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.Duration.String())
 }
+
+// IsZero reports whether d is zero, enabling omission via omitzero struct tags.
+func (d Duration) IsZero() bool { return d.Duration == 0 }

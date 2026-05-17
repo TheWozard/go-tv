@@ -17,6 +17,7 @@ import (
 	"go-tv/internal/api"
 	"go-tv/internal/channel"
 	"go-tv/internal/config"
+	"go-tv/internal/store"
 )
 
 //go:embed static
@@ -34,22 +35,36 @@ func main() {
 
 	logger := cfg.Logger.New()
 
-	schedule, err := channel.LoadSeriesDir(cfg.SeriesDir)
+	serFiles, err := store.LoadSeriesDir(cfg.SeriesDir)
 	if err != nil {
 		logger.Error("failed to load series", err)
 		os.Exit(1)
 	}
-	currentState := channel.LoadState(cfg.StatePath, schedule)
+	series := make([]*channel.Series, len(serFiles))
+	serPaths := make(map[string]string, len(serFiles))
+	for i, sf := range serFiles {
+		series[i] = sf.Series
+		serPaths[sf.Series.ID()] = sf.Path
+	}
+	schedule := channel.NewSchedule(series...)
+	currentState := store.LoadState(cfg.StatePath, schedule)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	saveSeries := func(id string, s *channel.Series) error {
+		return store.SaveSeries(serPaths[id], s)
+	}
+	saveState := func() error {
+		return store.SaveState(cfg.StatePath, currentState)
+	}
+
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
-	ch := channel.NewChannel(schedule, currentState)
+	ch := channel.NewChannel(schedule, currentState, saveSeries, saveState)
 	api.OpenChannel(r, ch, cfg.Player, cfg.Jellyfin, logger)
 
-	ch.StartAutoSave(ctx, 10*time.Minute)
+	store.AutoSave(ctx, cfg.StatePath, currentState, 10*time.Minute)
 
 	sub, err := fs.Sub(staticFiles, "static")
 	if err != nil {
@@ -64,7 +79,7 @@ func main() {
 	}
 
 	logger.Info("shutting down")
-	if err := ch.SaveState(); err != nil {
+	if err := store.SaveState(cfg.StatePath, ch.State()); err != nil {
 		logger.Error("failed to save state", err)
 		os.Exit(1)
 	}

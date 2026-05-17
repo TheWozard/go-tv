@@ -26,6 +26,7 @@ import (
 
 	"go-tv/internal/channel"
 	"go-tv/internal/client/sponsorblock"
+	"go-tv/internal/store"
 )
 
 func main() {
@@ -41,11 +42,18 @@ func main() {
 	}
 	videoID := flag.Arg(0)
 
-	sched, err := channel.LoadSeriesDir(*seriesDir)
+	serFiles, err := store.LoadSeriesDir(*seriesDir)
 	if err != nil {
 		slog.Error("failed to load series dir", "err", err)
 		os.Exit(1)
 	}
+	series := make([]*channel.Series, len(serFiles))
+	serPaths := make(map[string]string, len(serFiles))
+	for i, sf := range serFiles {
+		series[i] = sf.Series
+		serPaths[sf.Series.ID()] = sf.Path
+	}
+	sched := channel.NewSchedule(series...)
 
 	client := sponsorblock.New()
 	var categories []sponsorblock.Category
@@ -119,9 +127,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "video %s not found in series dir\n", videoID)
 		os.Exit(1)
 	}
-	videoLength := video.Length.Duration
+	videoLength := video.Length
 
-	var newSegments []channel.Segment
+	var newSegments []channel.Clip
 	if len(cuts) > 0 {
 		// Sort cuts by start time and merge overlapping.
 		sort.Slice(cuts, func(i, j int) bool { return cuts[i].start < cuts[j].start })
@@ -151,9 +159,9 @@ func main() {
 		}
 
 		// Clean up redundant values and empty segments.
-		v := &channel.Episode{Segments: newSegments, Length: video.Length}
+		v := &channel.Episode{Clips: newSegments, Length: videoLength}
 		v.Clean()
-		newSegments = v.Segments
+		newSegments = v.Clips
 	}
 
 	// Print result.
@@ -163,12 +171,12 @@ func main() {
 		fmt.Println("\n  result:")
 		for _, seg := range newSegments {
 			start := "0:00"
-			if seg.Start != nil {
-				start = sponsorblock.FormatDuration(seg.Start.Duration)
+			if seg.Start != 0 {
+				start = sponsorblock.FormatDuration(seg.Start)
 			}
 			end := sponsorblock.FormatDuration(videoLength)
-			if seg.End != nil {
-				end = sponsorblock.FormatDuration(seg.End.Duration)
+			if seg.End != 0 {
+				end = sponsorblock.FormatDuration(seg.End)
 			}
 			fmt.Printf("    %s → %s\n", start, end)
 		}
@@ -181,14 +189,14 @@ func main() {
 		for i, season := range seasons {
 			for j, ep := range season.Episodes {
 				if ep.Source.ID == videoID {
-					seasons[i].Episodes[j].Segments = newSegments
+					seasons[i].Episodes[j].Clips = newSegments
 					changed = true
 				}
 			}
 		}
 		if changed {
 			ser.UpdateSeasons(seasons)
-			if err := ser.Save(); err != nil {
+			if err := store.SaveSeries(serPaths[ser.ID()], ser); err != nil {
 				slog.Error("failed to save series", "name", ser.Name, "err", err)
 				os.Exit(1)
 			}
@@ -198,15 +206,6 @@ func main() {
 	}
 }
 
-func makeSegment(start, end time.Duration) channel.Segment {
-	seg := channel.Segment{}
-	if start > 0 {
-		d := channel.Duration{Duration: start}
-		seg.Start = &d
-	}
-	if end > 0 {
-		d := channel.Duration{Duration: end}
-		seg.End = &d
-	}
-	return seg
+func makeSegment(start, end time.Duration) channel.Clip {
+	return channel.Clip{Start: start, End: end}
 }

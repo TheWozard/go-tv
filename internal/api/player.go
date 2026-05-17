@@ -25,13 +25,13 @@ func (h *PlayerHandler) Mount(r chi.Router) {
 }
 
 func (h *PlayerHandler) stateHandler(w http.ResponseWriter, r *http.Request) {
-	source, position, stop, _ := h.channel.CurrentState()
+	frag := h.channel.CurrentFragment()
 	streamURL := ""
-	if source.Kind == channel.SourceKindJellyfin {
-		streamURL = h.jellyfin.StreamURL(source.ID)
+	if frag.Source.Kind == channel.SourceKindJellyfin {
+		streamURL = h.jellyfin.StreamURL(frag.Source.ID)
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.PlayerState(source, position, stop, streamURL).Render(r.Context(), w); err != nil {
+	if err := components.PlayerState(frag.Source, frag.Start, frag.End, streamURL).Render(r.Context(), w); err != nil {
 		h.logger.Error("render player state", err)
 	}
 }
@@ -56,13 +56,13 @@ func (h *PlayerHandler) nextHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	newSource, newPosition, newStop, _ := h.channel.CurrentState()
+	frag := h.channel.CurrentFragment()
 	streamURL := ""
-	if newSource.Kind == channel.SourceKindJellyfin {
-		streamURL = h.jellyfin.StreamURL(newSource.ID)
+	if frag.Source.Kind == channel.SourceKindJellyfin {
+		streamURL = h.jellyfin.StreamURL(frag.Source.ID)
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.PlayerState(newSource, newPosition, newStop, streamURL).Render(r.Context(), w); err != nil {
+	if err := components.PlayerState(frag.Source, frag.Start, frag.End, streamURL).Render(r.Context(), w); err != nil {
 		h.logger.Error("render player state", err)
 	}
 }

@@ -29,6 +29,7 @@ import (
 
 	"go-tv/internal/channel"
 	"go-tv/internal/config"
+	"go-tv/internal/store"
 )
 
 type jfItem struct {
@@ -55,11 +56,11 @@ func (item jfItem) displayTitle() string {
 	return item.Name
 }
 
-func (item jfItem) duration() channel.Duration {
+func (item jfItem) duration() time.Duration {
 	if item.RunTimeTicks == nil || *item.RunTimeTicks == 0 {
-		return channel.Duration{}
+		return 0
 	}
-	return channel.Duration{Duration: time.Duration(*item.RunTimeTicks * 100).Truncate(time.Second)}
+	return time.Duration(*item.RunTimeTicks * 100).Truncate(time.Second)
 }
 
 var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
@@ -100,8 +101,8 @@ func main() {
 
 	for i, item := range items {
 		dur := ""
-		if d := item.duration(); d.Duration > 0 {
-			dur = fmt.Sprintf("  [%s]", d.Duration.Round(time.Second))
+		if d := item.duration(); d > 0 {
+			dur = fmt.Sprintf("  [%s]", d.Round(time.Second))
 		}
 		fmt.Printf("  %2d. %-60s %s%s\n", i+1, item.displayTitle(), item.Type, dur)
 	}
@@ -136,8 +137,8 @@ func main() {
 
 	path := filepath.Join(*seriesDir, slugify(name)+".json")
 	season := channel.Season{Name: name, Episodes: episodes}
-	ser := channel.NewSeries(path, name, season)
-	if err := ser.Save(); err != nil {
+	ser := channel.NewSeries(name, season)
+	if err := store.SaveSeries(path, ser); err != nil {
 		slog.Error("failed to save series", "err", err)
 		os.Exit(1)
 	}

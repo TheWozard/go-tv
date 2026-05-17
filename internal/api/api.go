@@ -44,17 +44,17 @@ func (s *Server) Route(r chi.Router) {
 }
 
 func (s *Server) playerHandler(w http.ResponseWriter, r *http.Request) {
-	source, position, stopAt, _ := s.channel.CurrentState()
+	frag := s.channel.CurrentFragment()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.Player(source, position, stopAt, s.player, s.jellyfin).Render(r.Context(), w); err != nil {
+	if err := components.Player(frag.Source, frag.Start, frag.End, s.player, s.jellyfin).Render(r.Context(), w); err != nil {
 		s.logger.Error("render player", err)
 	}
 }
 
 func (s *Server) editHandler(w http.ResponseWriter, r *http.Request) {
-	source, position, _, _ := s.channel.CurrentState()
+	frag := s.channel.CurrentFragment()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.Editor(s.channel.AllSeries(), source, position, s.jellyfin.URL).Render(r.Context(), w); err != nil {
+	if err := components.Editor(s.channel.AllSeries(), s.channel.State(), frag.Source, frag.Start, s.jellyfin.URL).Render(r.Context(), w); err != nil {
 		s.logger.Error("render editor", err)
 	}
 }

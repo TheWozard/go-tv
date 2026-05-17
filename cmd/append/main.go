@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"go-tv/internal/channel"
+	"go-tv/internal/store"
 )
 
 // ytInfo holds the fields we use from yt-dlp's JSON output.
@@ -77,8 +78,8 @@ func main() {
 
 	path := filepath.Join(*seriesDir, slugify(name)+".json")
 	season := channel.Season{Name: name, Episodes: episodes}
-	ser := channel.NewSeries(path, name, season)
-	if err := ser.Save(); err != nil {
+	ser := channel.NewSeries(name, season)
+	if err := store.SaveSeries(path, ser); err != nil {
 		slog.Error("failed to save series", "err", err)
 		os.Exit(1)
 	}
@@ -88,8 +89,7 @@ func main() {
 func toEpisode(e ytInfo) channel.Episode {
 	v := channel.Episode{Source: channel.NewYoutubeSource(e.ID), Title: e.Title}
 	if e.Duration != nil && *e.Duration > 0 {
-		d := channel.Duration{Duration: time.Duration(*e.Duration * float64(time.Second)).Truncate(time.Second)}
-		v.Length = d
+		v.Length = time.Duration(*e.Duration * float64(time.Second)).Truncate(time.Second)
 	}
 	return v
 }

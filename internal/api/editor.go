@@ -39,9 +39,9 @@ func (h *EditorHandler) jumpHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	activeSource, activeAt, _, _ := h.channel.CurrentState()
+	frag := h.channel.CurrentFragment()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.VideoList(h.channel.AllSeries(), activeSource, activeAt, h.jellyfin.URL).Render(r.Context(), w); err != nil {
+	if err := components.VideoList(h.channel.AllSeries(), h.channel.State(), frag.Source, frag.Start, h.jellyfin.URL).Render(r.Context(), w); err != nil {
 		h.logger.Error("render video list", err)
 	}
 }
@@ -107,8 +107,9 @@ func (h *EditorHandler) sbPostHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	stateSource, stateAt := h.channel.SeriesStateOf(updated.Source)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.VideoCard(*updated, false, 0, h.jellyfin.URL).Render(r.Context(), w); err != nil {
+	if err := components.VideoCard(*updated, false, 0, stateSource, stateAt, h.jellyfin.URL).Render(r.Context(), w); err != nil {
 		h.logger.Error("render video card", err)
 	}
 }
