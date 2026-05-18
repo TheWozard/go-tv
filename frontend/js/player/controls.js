@@ -91,6 +91,14 @@ export function initControls(state, advance, reportProgress) {
   }
   requestAnimationFrame(tickProgress);
 
+  // Supplement rAF with setInterval so stop is enforced in background tabs
+  // where rAF is throttled. advance() is throttled so duplicate calls are safe.
+  setInterval(() => {
+    if (state.player && state.currentStop > 0) {
+      if (state.player.getCurrentTime() >= state.currentStop) advance();
+    }
+  }, 500);
+
   const skipLeft  = document.getElementById('skip-left');
   const skipRight = document.getElementById('skip-right');
   const skipSecs  = Math.round(skipMs / 1000);

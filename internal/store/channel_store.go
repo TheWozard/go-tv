@@ -71,6 +71,26 @@ func (cs *ChannelStore) ToggleSeriesActive(seriesID string) error {
 	return cs.saveState()
 }
 
+func (cs *ChannelStore) SetEpisodeMode(videoID string, mode channel.EpisodeMode) (*channel.Episode, error) {
+	ep, err := mutation.SetEpisodeMode(cs.Channel, videoID, mode)
+	if err != nil {
+		return nil, err
+	}
+	sr := cs.Channel.Schedule().SeriesOf(ep.Source)
+	if sr == nil {
+		return ep, nil
+	}
+	if err := cs.saveSeries(sr.ID); err != nil {
+		return nil, err
+	}
+	return ep, nil
+}
+
+func (cs *ChannelStore) ToggleShuffle() error {
+	cs.Channel.SetShuffle(!cs.Channel.State().Shuffle)
+	return cs.saveState()
+}
+
 func (cs *ChannelStore) saveSeries(id string) error {
 	path, ok := cs.seriesPaths[id]
 	if !ok {

@@ -53,6 +53,31 @@ header a:hover {
   color: #ccc;
 }
 
+.shuffle-btn {
+  background: none;
+  border: 1px solid #2a2a2a;
+  color: #555;
+  cursor: pointer;
+  font-size: .6rem;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  transition: color .15s, border-color .15s;
+}
+
+.shuffle-btn:hover {
+  color: #ccc;
+  border-color: #555;
+}
+
+.shuffle-btn.is-active {
+  border-color: #1e3a5c;
+  color: #4a90d9;
+}
+
 .series-item {
   list-style: none;
 }
@@ -253,6 +278,28 @@ header a:hover {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.mode-btn {
+  background: none;
+  border: none;
+  color: #444;
+  cursor: pointer;
+  font-size: .6rem;
+  padding: 0 2px;
+  line-height: 1;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  transition: color .15s;
+}
+
+.mode-btn:hover {
+  color: #aaa;
+}
+
+.mode-btn.is-active {
+  color: #4a90d9;
 }
 
 .play-btn {

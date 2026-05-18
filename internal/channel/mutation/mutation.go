@@ -65,6 +65,17 @@ func ReorderSeries(c *channel.Channel, seriesID string, orders []SeasonOrder) er
 	return nil
 }
 
+// SetEpisodeMode sets the EpisodeMode on the episode identified by videoID.
+// Returns a pointer to the updated episode, or an error if not found.
+func SetEpisodeMode(c *channel.Channel, videoID string, mode channel.EpisodeMode) (*channel.Episode, error) {
+	ep := findEpisode(c, videoID)
+	if ep == nil {
+		return nil, errors.New("episode not found")
+	}
+	*ep = ep.WithMode(mode)
+	return ep, nil
+}
+
 // ApplyCuts applies sponsorblock cut ranges to an episode identified by videoID.
 // It returns a pointer to the updated episode.
 func ApplyCuts(c *channel.Channel, videoID string, cuts []CutRange) (*channel.Episode, error) {

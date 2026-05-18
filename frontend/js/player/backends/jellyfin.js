@@ -3,7 +3,7 @@
 
 import Hls from 'hls.js';
 
-export function createJellyfinBackend(elementId, streamURL, startSeconds, { onEnded, onError, onStateChange }) {
+export function createJellyfinBackend(elementId, streamURL, startSeconds, stopSeconds, { onEnded, onError, onStateChange }) {
   const container = document.getElementById(elementId);
   const video = document.createElement('video');
   container.replaceChildren(video);
@@ -17,7 +17,7 @@ export function createJellyfinBackend(elementId, streamURL, startSeconds, { onEn
       video.addEventListener('error', onVideoError);
       video.addEventListener('play',  onPlay);
       video.addEventListener('pause', onPause);
-      const backend = wrap(video, hls, { onEnded, onError: onVideoError, onPlay, onPause });
+      const backend = wrap(video, hls, stopSeconds, { onEnded, onError: onVideoError, onPlay, onPause });
       video.currentTime = startSeconds;
       backend.play();
       resolve(backend);
@@ -30,7 +30,7 @@ export function createJellyfinBackend(elementId, streamURL, startSeconds, { onEn
       hls.on(Hls.Events.MANIFEST_PARSED, () => setup(hls));
       hls.on(Hls.Events.ERROR, (_, data) => { if (data.fatal) { console.error('[jellyfin] hls fatal error', data.type, data.details, data); onError(); } });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Safari native HLS
+      // Safari native HLS — no fragment-level control; stopSeconds enforced by controls.js.
       video.src = streamURL;
       video.addEventListener('loadedmetadata', () => setup(null), { once: true });
     } else {
@@ -39,12 +39,19 @@ export function createJellyfinBackend(elementId, streamURL, startSeconds, { onEn
   });
 }
 
-function wrap(video, hls, { onEnded, onError, onPlay, onPause }) {
+function wrap(video, hls, stopSeconds, { onEnded, onError, onPlay, onPause }) {
+  // Stop buffering fragments that start at or beyond the clip end.
+  if (hls && stopSeconds > 0) {
+    hls.on(Hls.Events.FRAG_LOADING, (_, data) => {
+      if (data.frag.start >= stopSeconds) hls.stopLoad();
+    });
+  }
+
   const play = () => video.play().catch(() => {});
   return {
     play,
     pause()          { video.pause(); },
-    seekTo(s)        { video.currentTime = s; },
+    seekTo(s)        { video.currentTime = s; hls?.startLoad(); },
     getCurrentTime() { return video.currentTime; },
     getDuration()    { return isFinite(video.duration) ? video.duration : 0; },
     getState() {
@@ -56,6 +63,7 @@ function wrap(video, hls, { onEnded, onError, onPlay, onPause }) {
       // For Jellyfin the stream URL encodes the item; a source change in
       // applyState will construct a new backend instead of calling loadVideo.
       video.currentTime = startSeconds;
+      hls?.startLoad();
       play();
     },
     destroy() {

@@ -91,7 +91,7 @@ function applyState(sourceKind, sourceId, seconds, stopSeconds, streamURL) {
         state.player = backend;
       });
   } else if (sourceKind === 'jellyfin') {
-    createJellyfinBackend('player', streamURL, seconds, callbacks)
+    createJellyfinBackend('player', streamURL, seconds, stopSeconds, callbacks)
       .then(backend => {
         if (token !== loadToken) { backend.destroy(); return; }
         state.player = backend;
@@ -106,6 +106,15 @@ function applyCurrentState() {
   if (!started) return;
   const el = document.getElementById('player-state');
   if (!el) return;
+  if (el.dataset.ended) {
+    state.player?.destroy();
+    state.player = null;
+    state.currentSource = null;
+    started = false;
+    document.getElementById('start-screen').style.display = '';
+    document.getElementById('player-wrapper').style.display = '';
+    return;
+  }
   applyState(
     el.dataset.sourceKind,
     el.dataset.sourceId,
@@ -168,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.detail.target?.id === 'player-state') applyCurrentState();
   });
 
-  // htmx.ajax doesn't reject on HTTP errors — pause the player when /api/next fails.
+  // htmx.ajax doesn't reject on HTTP errors — pause the player on unexpected errors.
   document.addEventListener('htmx:responseError', e => {
     if (e.detail.target?.id === 'player-state') state.player?.pause();
   });

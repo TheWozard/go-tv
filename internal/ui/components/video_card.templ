@@ -23,6 +23,7 @@ templ VideoCard(v channel.Episode, isActive bool, activeAt time.Duration, stateS
 	{{ lenSecs := v.Length.Seconds() }}
 	{{ maxSecs := lenSecs; if maxSecs <= 0 { maxSecs = 600 } }}
 	<li
+		id={ "card-" + src.ID }
 		class={ "card", templ.KV("active", isActive) }
 		data-id={ src.ID }
 	>
@@ -54,6 +55,14 @@ templ VideoCard(v channel.Episode, isActive bool, activeAt time.Duration, stateS
 					} else {
 						<span class="vid-id text-muted">{ src.ID }</span>
 					}
+					<button
+						class={ "mode-btn", templ.KV("is-active", v.Mode == channel.EpisodeContinueMode) }
+						title="toggle continue mode"
+						hx-post="/api/episode/mode"
+						hx-target={ "#card-" + src.ID }
+						hx-swap="outerHTML"
+						hx-vals={ jumpVals(src.Kind, src.ID, "") }
+					>cont</button>
 					<button
 						class="play-btn"
 						title="jump to this video"

@@ -54,15 +54,31 @@ templ SeriesSection(ser *channel.Series, state *channel.State, active channel.So
 	</li>
 }
 
+templ EditorHeader(state *channel.State) {
+	<header id="editor-header">
+		<h1>go-tv</h1>
+		<nav>
+			<button
+				class={ "shuffle-btn", templ.KV("is-active", state.Shuffle) }
+				hx-post="/api/shuffle"
+				hx-target="#editor-header"
+				hx-swap="outerHTML"
+			>
+				if state.Shuffle {
+					shuffle: on
+				} else {
+					shuffle: off
+				}
+			</button>
+			<a href="/">Resume</a>
+		</nav>
+	</header>
+}
+
 templ Editor(series []*channel.Series, state *channel.State, active channel.Source, activeAt time.Duration, jellyfinBaseURL string) {
 	@Layout("go-tv / edit", "editor") {
 		<body class="editor">
-			<header>
-				<h1>go-tv</h1>
-				<nav>
-					<a href="/">Resume</a>
-				</nav>
-			</header>
+			@EditorHeader(state)
 			@VideoList(series, state, active, activeAt, jellyfinBaseURL)
 		</body>
 	}
