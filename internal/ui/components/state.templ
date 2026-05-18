@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// PlayerState is the fragment that carries current playback state.
+// PlayerState is the segment that carries current playback state.
 // The player bridge in player.js reads these data-* attributes via MutationObserver.
 templ PlayerState(source channel.Source, position, stopAt time.Duration, streamURL string) {
 	<div
@@ -17,4 +17,9 @@ templ PlayerState(source channel.Source, position, stopAt time.Duration, streamU
 		data-stop-at={ fmt.Sprintf("%g", stopAt.Seconds()) }
 		data-stream-url={ streamURL }
 	></div>
+}
+
+// SeriesEndedState signals to the player that there is no next segment.
+templ SeriesEndedState() {
+	<div id="player-state" data-ended="true"></div>
 }

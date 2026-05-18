@@ -16,6 +16,7 @@ type SeriesFile struct {
 }
 
 // LoadSeries reads and decodes a Series from the given JSON file.
+// If the file has no ID (legacy data), a new one is generated and written back.
 func LoadSeries(path string) (*channel.Series, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -26,7 +27,14 @@ func LoadSeries(path string) (*channel.Series, error) {
 	if err := json.NewDecoder(f).Decode(&dto); err != nil {
 		return nil, err
 	}
-	return fromSeriesDTO(dto), nil
+	needsID := dto.ID == ""
+	sr := fromSeriesDTO(dto)
+	if needsID {
+		if err := SaveSeries(path, sr); err != nil {
+			return nil, err
+		}
+	}
+	return sr, nil
 }
 
 // SaveSeries writes s to path as pretty-printed JSON.
@@ -69,12 +77,12 @@ func LoadSeriesDir(dir string) ([]SeriesFile, error) {
 
 // LoadState reads persisted state from path. If the file is missing, corrupt,
 // or refers to a position no longer valid in the schedule, it falls back to
-// the first playable fragment.
+// the first playable segment.
 func LoadState(path string, schedule *channel.Schedule) *channel.State {
 	makeDefault := func() *channel.State {
-		if first, ok := schedule.First(); ok {
+		if first, ok := schedule.First(func(string) bool { return true }); ok {
 			if ser := schedule.SeriesOf(first.Source); ser != nil {
-				return channel.NewStateFor(ser.ID(), first.Source, first.Start)
+				return channel.NewStateFor(ser.ID, first.Source, first.Clip.Start)
 			}
 		}
 		return channel.NewEmptyState()
@@ -97,9 +105,9 @@ func LoadState(path string, schedule *channel.Schedule) *channel.State {
 
 	state := fromStateDTO(dto)
 	src, pos := state.Get()
-	if current, ok := schedule.Current(src, pos); ok {
-		if !current.Source.Equal(src) || current.Start > pos {
-			state.Jump(state.ActiveSeries, current.Source, current.Start)
+	if current, ok := schedule.CurrentSegmentAt(src, pos, state.Shuffle, state.IsActive); ok {
+		if !current.Source.Equal(src) || current.Clip.Start > pos {
+			state.Jump(state.ActiveSeries, current.Source, current.Clip.Start)
 		}
 		return state
 	}

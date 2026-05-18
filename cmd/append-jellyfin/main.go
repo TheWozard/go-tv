@@ -116,11 +116,7 @@ func main() {
 	episodes := make([]channel.Episode, 0, len(selected))
 	for _, idx := range selected {
 		item := items[idx]
-		ep := channel.Episode{
-			Source: channel.NewJellyfinSource(item.ID),
-			Title:  item.displayTitle(),
-			Length: item.duration(),
-		}
+		ep := channel.NewEpisode(channel.NewJellyfinSource(item.ID), item.duration()).WithTitle(item.displayTitle())
 		episodes = append(episodes, ep)
 		fmt.Printf("  + %s  %s\n", item.ID, item.displayTitle())
 	}
@@ -136,8 +132,7 @@ func main() {
 	}
 
 	path := filepath.Join(*seriesDir, slugify(name)+".json")
-	season := channel.Season{Name: name, Episodes: episodes}
-	ser := channel.NewSeries(name, season)
+	ser := channel.NewSeries(name, channel.LoopMode, channel.NewSeason(name, episodes...))
 	if err := store.SaveSeries(path, ser); err != nil {
 		slog.Error("failed to save series", "err", err)
 		os.Exit(1)

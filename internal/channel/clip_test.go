@@ -35,21 +35,3 @@ func TestClipCompare(t *testing.T) {
 	}
 }
 
-func TestClipWindow(t *testing.T) {
-	tests := []struct {
-		name       string
-		start, end time.Duration
-	}{
-		{"zero", 0, 0},
-		{"non-zero", 10 * time.Second, 60 * time.Second},
-		{"both equal", 30 * time.Second, 30 * time.Second},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c := channel.NewClip(tt.start, tt.end)
-			s, e := c.Window()
-			assert.Equal(t, tt.start, s)
-			assert.Equal(t, tt.end, e)
-		})
-	}
-}

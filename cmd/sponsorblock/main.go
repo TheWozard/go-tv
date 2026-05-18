@@ -51,7 +51,7 @@ func main() {
 	serPaths := make(map[string]string, len(serFiles))
 	for i, sf := range serFiles {
 		series[i] = sf.Series
-		serPaths[sf.Series.ID()] = sf.Path
+		serPaths[sf.Series.ID] = sf.Path
 	}
 	sched := channel.NewSchedule(series...)
 
@@ -159,9 +159,7 @@ func main() {
 		}
 
 		// Clean up redundant values and empty segments.
-		v := &channel.Episode{Clips: newSegments, Length: videoLength}
-		v.Clean()
-		newSegments = v.Clips
+		newSegments = store.CleanEpisode(channel.NewEpisode(channel.Source{}, videoLength).WithClips(newSegments...)).Clips
 	}
 
 	// Print result.
@@ -183,20 +181,20 @@ func main() {
 	}
 
 	// Update the series file that contains this episode.
-	for _, ser := range sched.AllSeries() {
-		seasons := ser.AllSeasons()
+	for _, ser := range sched.Series {
+		seasons := ser.Seasons
 		changed := false
 		for i, season := range seasons {
 			for j, ep := range season.Episodes {
 				if ep.Source.ID == videoID {
-					seasons[i].Episodes[j].Clips = newSegments
+					seasons[i].Episodes[j] = seasons[i].Episodes[j].WithClips(newSegments...)
 					changed = true
 				}
 			}
 		}
 		if changed {
-			ser.UpdateSeasons(seasons)
-			if err := store.SaveSeries(serPaths[ser.ID()], ser); err != nil {
+			ser.Seasons = seasons
+			if err := store.SaveSeries(serPaths[ser.ID], ser); err != nil {
 				slog.Error("failed to save series", "name", ser.Name, "err", err)
 				os.Exit(1)
 			}
@@ -207,5 +205,5 @@ func main() {
 }
 
 func makeSegment(start, end time.Duration) channel.Clip {
-	return channel.Clip{Start: start, End: end}
+	return channel.NewClip(start, end)
 }

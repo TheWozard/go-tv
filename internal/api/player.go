@@ -8,12 +8,13 @@ import (
 	"go-tv/internal/channel"
 	"go-tv/internal/config"
 	"go-tv/internal/log"
+	"go-tv/internal/store"
 	"go-tv/internal/ui/components"
 )
 
 // PlayerHandler serves HTMX endpoints used by the player page.
 type PlayerHandler struct {
-	channel  *channel.Channel
+	channel  *store.ChannelStore
 	jellyfin config.Jellyfin
 	logger   *log.Logger
 }
@@ -25,13 +26,13 @@ func (h *PlayerHandler) Mount(r chi.Router) {
 }
 
 func (h *PlayerHandler) stateHandler(w http.ResponseWriter, r *http.Request) {
-	frag := h.channel.CurrentFragment()
+	seg := h.channel.CurrentSegment()
 	streamURL := ""
-	if frag.Source.Kind == channel.SourceKindJellyfin {
-		streamURL = h.jellyfin.StreamURL(frag.Source.ID)
+	if seg.Source.Kind == channel.SourceKindJellyfin {
+		streamURL = h.jellyfin.StreamURL(seg.Source.ID)
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.PlayerState(frag.Source, frag.Start, frag.End, streamURL).Render(r.Context(), w); err != nil {
+	if err := components.PlayerState(seg.Source, seg.Clip.Start, seg.Clip.End, streamURL).Render(r.Context(), w); err != nil {
 		h.logger.Error("render player state", err)
 	}
 }
@@ -52,17 +53,18 @@ func (h *PlayerHandler) nextHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid source", http.StatusBadRequest)
 		return
 	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := h.channel.Next(source, parseDuration(r, "seconds")); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		components.SeriesEndedState().Render(r.Context(), w)
 		return
 	}
-	frag := h.channel.CurrentFragment()
+	seg := h.channel.CurrentSegment()
 	streamURL := ""
-	if frag.Source.Kind == channel.SourceKindJellyfin {
-		streamURL = h.jellyfin.StreamURL(frag.Source.ID)
+	if seg.Source.Kind == channel.SourceKindJellyfin {
+		streamURL = h.jellyfin.StreamURL(seg.Source.ID)
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.PlayerState(frag.Source, frag.Start, frag.End, streamURL).Render(r.Context(), w); err != nil {
+	if err := components.PlayerState(seg.Source, seg.Clip.Start, seg.Clip.End, streamURL).Render(r.Context(), w); err != nil {
 		h.logger.Error("render player state", err)
 	}
 }

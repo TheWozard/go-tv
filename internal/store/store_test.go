@@ -18,14 +18,9 @@ import (
 func makeSeries(name string, ids ...string) *channel.Series {
 	episodes := make([]channel.Episode, len(ids))
 	for i, id := range ids {
-		episodes[i] = channel.Episode{
-			Source: channel.NewTestSource(id),
-			Title:  id,
-			Length: 10 * time.Minute,
-		}
+		episodes[i] = channel.NewEpisode(channel.NewTestSource(id), 10*time.Minute).WithTitle(id)
 	}
-	season := channel.Season{Name: name, Episodes: episodes}
-	return channel.NewSeries(name, season)
+	return channel.NewSeries(name, channel.LoopMode, channel.NewSeason(name, episodes...))
 }
 
 func newTestSchedule(series ...*channel.Series) *channel.Schedule {
@@ -36,11 +31,11 @@ func newTestSchedule(series ...*channel.Series) *channel.Schedule {
 
 func TestSeries_SaveLoad(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "futurama.json")
-	season := channel.Season{Name: "Season 1", Episodes: []channel.Episode{
-		{Source: channel.NewTestSource("a"), Title: "ep a", Length: 30 * time.Minute},
-		{Source: channel.NewTestSource("b"), Title: "ep b", Length: 30 * time.Minute},
-	}}
-	ser := channel.NewSeries("Futurama", season)
+	season := channel.NewSeason("Season 1",
+		channel.NewEpisode(channel.NewTestSource("a"), 30*time.Minute).WithTitle("ep a"),
+		channel.NewEpisode(channel.NewTestSource("b"), 30*time.Minute).WithTitle("ep b"),
+	)
+	ser := channel.NewSeries("Futurama", channel.LoopMode, season)
 	require.NoError(t, store.SaveSeries(path, ser))
 
 	loaded, err := store.LoadSeries(path)
@@ -83,7 +78,7 @@ func TestLoadState_MissingFile(t *testing.T) {
 	schedule := newTestSchedule(makeSeries("p1", "a"))
 	s := store.LoadState("/nonexistent/state.json", schedule)
 	source, pos := s.Get()
-	assert.Equal(t, "a", source.ID, "should fall back to first fragment")
+	assert.Equal(t, "a", source.ID, "should fall back to first segment")
 	assert.Equal(t, time.Duration(0), pos)
 }
 
@@ -95,7 +90,7 @@ func TestLoadState_InvalidJSON(t *testing.T) {
 	sched := newTestSchedule(makeSeries("p1", "a"))
 	s := store.LoadState(path, sched)
 	source, _ := s.Get()
-	assert.Equal(t, "a", source.ID, "should fall back to first fragment")
+	assert.Equal(t, "a", source.ID, "should fall back to first segment")
 }
 
 func TestLoadState_VideoRemovedFromSchedule(t *testing.T) {
@@ -117,12 +112,12 @@ func TestLoadState_VideoRemovedFromSchedule(t *testing.T) {
 func TestLoadSeriesDir(t *testing.T) {
 	dir := t.TempDir()
 
-	s1 := channel.NewSeries("Futurama", channel.Season{Name: "Season 1", Episodes: []channel.Episode{
-		{Source: channel.NewTestSource("a"), Length: 30 * time.Minute},
-	}})
-	s2 := channel.NewSeries("Music", channel.Season{Name: "Hits", Episodes: []channel.Episode{
-		{Source: channel.NewTestSource("b"), Length: 5 * time.Minute},
-	}})
+	s1 := channel.NewSeries("Futurama", channel.LoopMode, channel.NewSeason("Season 1",
+		channel.NewEpisode(channel.NewTestSource("a"), 30*time.Minute),
+	))
+	s2 := channel.NewSeries("Music", channel.LoopMode, channel.NewSeason("Hits",
+		channel.NewEpisode(channel.NewTestSource("b"), 5*time.Minute),
+	))
 	require.NoError(t, store.SaveSeries(filepath.Join(dir, "futurama.json"), s1))
 	require.NoError(t, store.SaveSeries(filepath.Join(dir, "music.json"), s2))
 
@@ -131,8 +126,7 @@ func TestLoadSeriesDir(t *testing.T) {
 	assert.Len(t, serFiles, 2)
 
 	sched := channel.NewSchedule(serFiles[0].Series, serFiles[1].Series)
-	assert.Len(t, sched.AllSeries(), 2)
-	assert.Len(t, sched.All(), 2)
+	assert.Len(t, sched.Series, 2)
 }
 
 func TestLoadSeriesDir_NotFound(t *testing.T) {
@@ -142,9 +136,9 @@ func TestLoadSeriesDir_NotFound(t *testing.T) {
 
 func TestLoadSeriesDir_SkipsStateFiles(t *testing.T) {
 	dir := t.TempDir()
-	ser := channel.NewSeries("Show", channel.Season{Name: "S1", Episodes: []channel.Episode{
-		{Source: channel.NewTestSource("a"), Length: 10 * time.Minute},
-	}})
+	ser := channel.NewSeries("Show", channel.LoopMode, channel.NewSeason("S1",
+		channel.NewEpisode(channel.NewTestSource("a"), 10*time.Minute),
+	))
 	require.NoError(t, store.SaveSeries(filepath.Join(dir, "show.json"), ser))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "show.state.json"), []byte(`{}`), 0644))
 

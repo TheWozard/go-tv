@@ -9,18 +9,20 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"go-tv/internal/channel"
+	"go-tv/internal/channel/mutation"
 	"go-tv/internal/config"
 	"go-tv/internal/log"
+	"go-tv/internal/store"
 	"go-tv/internal/ui/components"
 )
 
-func OpenChannel(r chi.Router, ch *channel.Channel, player config.Player, jellyfin config.Jellyfin, logger *log.Logger) {
+func OpenChannel(r chi.Router, ch *store.ChannelStore, player config.Player, jellyfin config.Jellyfin, logger *log.Logger) {
 	s := &Server{channel: ch, player: player, jellyfin: jellyfin, logger: logger}
 	s.Route(r)
 }
 
 type Server struct {
-	channel  *channel.Channel
+	channel  *store.ChannelStore
 	player   config.Player
 	jellyfin config.Jellyfin
 	logger   *log.Logger
@@ -44,17 +46,17 @@ func (s *Server) Route(r chi.Router) {
 }
 
 func (s *Server) playerHandler(w http.ResponseWriter, r *http.Request) {
-	frag := s.channel.CurrentFragment()
+	seg := s.channel.CurrentSegment()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.Player(frag.Source, frag.Start, frag.End, s.player, s.jellyfin).Render(r.Context(), w); err != nil {
+	if err := components.Player(seg.Source, seg.Clip.Start, seg.Clip.End, s.player, s.jellyfin).Render(r.Context(), w); err != nil {
 		s.logger.Error("render player", err)
 	}
 }
 
 func (s *Server) editHandler(w http.ResponseWriter, r *http.Request) {
-	frag := s.channel.CurrentFragment()
+	seg := s.channel.CurrentSegment()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.Editor(s.channel.AllSeries(), s.channel.State(), frag.Source, frag.Start, s.jellyfin.URL).Render(r.Context(), w); err != nil {
+	if err := components.Editor(s.channel.AllSeries(), s.channel.State(), seg.Source, seg.Clip.Start, s.jellyfin.URL).Render(r.Context(), w); err != nil {
 		s.logger.Error("render editor", err)
 	}
 }
@@ -71,9 +73,9 @@ func (s *Server) scheduleReorderHandler(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	orders := make([]channel.SeasonOrder, len(req.Seasons))
+	orders := make([]mutation.SeasonOrder, len(req.Seasons))
 	for i, s := range req.Seasons {
-		orders[i] = channel.SeasonOrder{Name: s.Name, EpisodeIDs: s.EpisodeIDs}
+		orders[i] = mutation.SeasonOrder{Name: s.Name, EpisodeIDs: s.EpisodeIDs}
 	}
 	if err := s.channel.ReorderSeries(req.SeriesName, orders); err != nil {
 		http.Error(w, "failed to save", http.StatusInternalServerError)

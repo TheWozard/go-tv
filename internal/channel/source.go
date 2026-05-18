@@ -9,35 +9,43 @@ const (
 	SourceKindJellyfin SourceKind = "jellyfin"
 )
 
+// Source is a platform-scoped video identifier. The combination of Kind + ID uniquely
+// addresses a single video across all supported backends.
+type Source struct {
+	Kind SourceKind
+	ID   string
+}
+
 func NewTestSource(id string) Source {
-	return Source{kind: SourceKindTest, id: id}
+	return Source{Kind: SourceKindTest, ID: id}
 }
 
 func NewYoutubeSource(id string) Source {
-	return Source{kind: SourceKindYoutube, id: id}
+	return Source{Kind: SourceKindYoutube, ID: id}
 }
 
 func NewJellyfinSource(id string) Source {
-	return Source{kind: SourceKindJellyfin, id: id}
-}
-
-type Source struct {
-	kind SourceKind
-	id   string
-}
-
-func (s Source) GetKind() SourceKind {
-	return s.kind
-}
-
-func (s Source) GetID() string {
-	return s.id
+	return Source{Kind: SourceKindJellyfin, ID: id}
 }
 
 func (s Source) Equal(o Source) bool {
-	return s.kind == o.kind && s.id == o.id
+	return s.Kind == o.Kind && s.ID == o.ID
 }
 
+// IsZero reports whether the source is the zero value (no ID set).
 func (s Source) IsZero() bool {
-	return s.id == ""
+	return s.ID == ""
+}
+
+// NewValidatedSource constructs a Source only if kind is a known value and id is non-empty.
+func NewValidatedSource(kind SourceKind, id string) (Source, bool) {
+	switch kind {
+	case SourceKindTest, SourceKindYoutube, SourceKindJellyfin:
+	default:
+		return Source{}, false
+	}
+	if id == "" {
+		return Source{}, false
+	}
+	return Source{Kind: kind, ID: id}, true
 }

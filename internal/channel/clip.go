@@ -5,31 +5,22 @@ import (
 	"time"
 )
 
+// Clip is a half-open time range [Start, End) within a video.
+// When an Episode has no explicit clips, a synthetic clip spanning [0, Length) is used.
 type Clip struct {
-	start time.Duration
-	end   time.Duration
+	Start time.Duration
+	End   time.Duration
 }
 
+// NewClip constructs a Clip. If start > end, start is clamped to end.
 func NewClip(start, end time.Duration) Clip {
-	return Clip{start: start, end: end}
+	if start > end {
+		start = end
+	}
+	return Clip{Start: start, End: end}
 }
 
-func (c Clip) Start() time.Duration {
-	return c.start
-}
-
-func (c Clip) End() time.Duration {
-	return c.end
-}
-
-func (c Clip) Window() (time.Duration, time.Duration) {
-	return c.start, c.end
-}
-
+// Compare orders clips by Start time. Used for sorting.
 func (c Clip) Compare(o Clip) int {
-	return cmp.Compare(c.start, o.start)
-}
-
-func (c Clip) At(position time.Duration) Clip {
-	return NewClip(min(max(c.start, position), c.end), c.end)
+	return cmp.Compare(c.Start, o.Start)
 }

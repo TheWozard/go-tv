@@ -19,11 +19,12 @@ func jumpVals(kind channel.SourceKind, id, seconds string) string {
 }
 
 templ VideoCard(v channel.Episode, isActive bool, activeAt time.Duration, stateSource channel.Source, stateAt time.Duration, jellyfinBaseURL string) {
+	{{ src := v.Source }}
 	{{ lenSecs := v.Length.Seconds() }}
 	{{ maxSecs := lenSecs; if maxSecs <= 0 { maxSecs = 600 } }}
 	<li
 		class={ "card", templ.KV("active", isActive) }
-		data-id={ v.Source.ID }
+		data-id={ src.ID }
 	>
 		<div class="handle" title="drag to reorder">⠿</div>
 		<div class="body">
@@ -32,40 +33,40 @@ templ VideoCard(v channel.Episode, isActive bool, activeAt time.Duration, stateS
 					if v.Title != "" {
 						{ v.Title }
 					} else {
-						{ v.Source.ID }
+						{ src.ID }
 					}
 				</span>
 				<span class="meta-right">
-					if v.Source.Kind == channel.SourceKindYoutube {
+					if src.Kind == channel.SourceKindYoutube {
 						<a
 							class="vid-id yt-link text-muted"
-							href={ templ.URL("https://www.youtube.com/watch?v=" + v.Source.ID) }
+							href={ templ.URL("https://www.youtube.com/watch?v=" + src.ID) }
 							target="_blank"
 							rel="noopener"
-						>↗ { v.Source.ID }</a>
-					} else if v.Source.Kind == channel.SourceKindJellyfin {
+						>↗ { src.ID }</a>
+					} else if src.Kind == channel.SourceKindJellyfin {
 						<a
 							class="vid-id jf-link text-muted"
-							href={ templ.URL(jellyfinBaseURL + "/web/index.html#!/details?id=" + v.Source.ID) }
+							href={ templ.URL(jellyfinBaseURL + "/web/index.html#!/details?id=" + src.ID) }
 							target="_blank"
 							rel="noopener"
-						>↗ { v.Source.ID }</a>
+						>↗ { src.ID }</a>
 					} else {
-						<span class="vid-id text-muted">{ v.Source.ID }</span>
+						<span class="vid-id text-muted">{ src.ID }</span>
 					}
 					<button
 						class="play-btn"
 						title="jump to this video"
 						hx-post="/api/jump"
-						hx-target="#video-list"
+						hx-target="#series-list"
 						hx-swap="outerHTML"
-						hx-vals={ jumpVals(v.Source.Kind, v.Source.ID, "0") }
+						hx-vals={ jumpVals(src.Kind, src.ID, "0") }
 					>▶</button>
 				</span>
 			</div>
 			<div class="segs-bar">
 				<div class="segs-bar-track">
-					for _, seg := range v.Segments {
+					for _, seg := range v.Clips {
 						{{ start := seg.Start.Seconds() }}
 						{{ end := lenSecs; if seg.End != 0 { end = seg.End.Seconds() } }}
 						if lenSecs > 0 {
@@ -77,17 +78,17 @@ templ VideoCard(v channel.Episode, isActive bool, activeAt time.Duration, stateS
 						}
 					}
 				</div>
-				if v.Source.Kind == channel.SourceKindYoutube {
+				if src.Kind == channel.SourceKindYoutube {
 					<button
 						class="sb-btn"
 						title="check SponsorBlock segments"
-						hx-get={ "/api/sponsorblock/" + v.Source.ID }
-					hx-target={ "#sb-panel-" + v.Source.ID }
+						hx-get={ "/api/sponsorblock/" + src.ID }
+					hx-target={ "#sb-panel-" + src.ID }
 					hx-swap="outerHTML"
 					>SB</button>
 				}
 			</div>
-			<div id={ "sb-panel-" + v.Source.ID }></div>
+			<div id={ "sb-panel-" + src.ID }></div>
 			if isActive {
 				{{ activeSecs := activeAt.Seconds() }}
 				<div class="pos-wrap">
@@ -107,7 +108,7 @@ templ VideoCard(v channel.Episode, isActive bool, activeAt time.Duration, stateS
 							hx-post="/api/jump"
 							hx-trigger="change"
 							hx-swap="none"
-							hx-vals={ jumpVals(v.Source.Kind, v.Source.ID, "") }
+							hx-vals={ jumpVals(src.Kind, src.ID, "") }
 						/>
 					</div>
 					<div class="times text-muted">
@@ -115,7 +116,7 @@ templ VideoCard(v channel.Episode, isActive bool, activeAt time.Duration, stateS
 						<span class="pos-display">{ fmtSecs(activeSecs) }</span>
 					</div>
 				</div>
-			} else if v.Source.Equal(stateSource) {
+			} else if src.Equal(stateSource) {
 				{{ savedSecs := stateAt.Seconds() }}
 				<div class="pos-wrap saved">
 					<div class="pos-slider-wrap">
@@ -134,7 +135,7 @@ templ VideoCard(v channel.Episode, isActive bool, activeAt time.Duration, stateS
 							hx-post="/api/jump"
 							hx-trigger="change"
 							hx-swap="none"
-							hx-vals={ jumpVals(v.Source.Kind, v.Source.ID, "") }
+							hx-vals={ jumpVals(src.Kind, src.ID, "") }
 						/>
 					</div>
 					<div class="times text-muted">

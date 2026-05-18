@@ -60,7 +60,7 @@ func TestEpisodeIterClips(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.episode.Clips()
+			got := slices.Collect(tt.episode.IterClips())
 			require.Equal(t, len(tt.wantClips), len(got))
 			assert.True(t, slices.Equal(tt.wantClips, got))
 		})

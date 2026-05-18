@@ -1,9 +1,15 @@
 package components
 
 import (
+	"encoding/json"
 	"go-tv/internal/channel"
 	"time"
 )
+
+func toggleVals(seriesID string) string {
+	b, _ := json.Marshal(map[string]string{"series_id": seriesID})
+	return string(b)
+}
 
 templ VideoList(series []*channel.Series, state *channel.State, active channel.Source, activeAt time.Duration, jellyfinBaseURL string) {
 	if len(series) == 0 {
@@ -21,14 +27,28 @@ templ VideoList(series []*channel.Series, state *channel.State, active channel.S
 
 templ SeriesSection(ser *channel.Series, state *channel.State, active channel.Source, activeAt time.Duration, jellyfinBaseURL string) {
 	{{ isActiveSeries := false; for _, season := range ser.Seasons { for _, ep := range season.Episodes { if ep.Source.Equal(active) { isActiveSeries = true; break } } } }}
-	{{ stateSource, stateAt := state.GetSeriesState(ser.ID()) }}
-	<li class={ "series-item", templ.KV("active-series", isActiveSeries) } data-series-name={ ser.ID() }>
+	{{ stateSource, stateAt := state.GetSeriesState(ser.ID) }}
+	{{ seriesActive := state.IsActive(ser.ID) }}
+	<li class={ "series-item", templ.KV("active-series", isActiveSeries), templ.KV("inactive-series", !seriesActive) } id={ "series-" + ser.ID } data-series-name={ ser.ID }>
 		<div class="series-header">
 			<span class="series-title">{ ser.Name }</span>
+			<button
+				class={ "series-active-btn", templ.KV("is-inactive", !seriesActive) }
+				hx-post="/api/series/toggle"
+				hx-vals={ toggleVals(ser.ID) }
+				hx-target={ "#series-" + ser.ID }
+				hx-swap="outerHTML"
+			>
+				if seriesActive {
+					active
+				} else {
+					inactive
+				}
+			</button>
 		</div>
-		<ul class="series-seasons" id={ "series-seasons-" + ser.ID() }>
+		<ul class="series-seasons" id={ "series-seasons-" + ser.ID }>
 			for _, season := range ser.Seasons {
-				@SetGroup(season, ser.ID(), active, activeAt, stateSource, stateAt, jellyfinBaseURL)
+				@SetGroup(season, ser.ID, active, activeAt, stateSource, stateAt, jellyfinBaseURL)
 			}
 		</ul>
 	</li>

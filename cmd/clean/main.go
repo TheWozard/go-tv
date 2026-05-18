@@ -26,13 +26,13 @@ func main() {
 
 	for _, sf := range serFiles {
 		ser := sf.Series
-		seasons := ser.AllSeasons()
+		seasons := ser.Seasons
 		for i, season := range seasons {
 			for j := range season.Episodes {
-				seasons[i].Episodes[j].Clean()
+				seasons[i].Episodes[j] = store.CleanEpisode(seasons[i].Episodes[j])
 			}
 		}
-		ser.UpdateSeasons(seasons)
+		ser.Seasons = seasons
 		if err := store.SaveSeries(sf.Path, ser); err != nil {
 			slog.Error("failed to save series", "name", ser.Name, "err", err)
 			os.Exit(1)

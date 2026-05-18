@@ -53,6 +53,55 @@ header a:hover {
   color: #ccc;
 }
 
+.series-item {
+  list-style: none;
+}
+
+.series-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0 10px;
+  gap: 8px;
+}
+
+.series-title {
+  font-size: .8rem;
+  font-weight: 600;
+  color: #666;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.series-active-btn {
+  background: none;
+  border: 1px solid #2a5c30;
+  color: #4a8c50;
+  cursor: pointer;
+  font-size: .6rem;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  transition: opacity .15s;
+  align-self: center;
+}
+
+.series-active-btn:hover {
+  opacity: .7;
+}
+
+.series-active-btn.is-inactive {
+  border-color: #4a3a1a;
+  color: #7a5a2a;
+}
+
+.series-item.inactive-series > .series-seasons {
+  opacity: .4;
+}
+
 #video-list {
   list-style: none;
   max-width: 860px;

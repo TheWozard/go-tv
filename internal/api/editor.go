@@ -9,15 +9,17 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"go-tv/internal/channel"
+	"go-tv/internal/channel/mutation"
 	"go-tv/internal/client/sponsorblock"
 	"go-tv/internal/config"
 	"go-tv/internal/log"
+	"go-tv/internal/store"
 	"go-tv/internal/ui/components"
 )
 
 // EditorHandler serves HTMX endpoints used by the editor page.
 type EditorHandler struct {
-	channel  *channel.Channel
+	channel  *store.ChannelStore
 	jellyfin config.Jellyfin
 	logger   *log.Logger
 }
@@ -25,6 +27,7 @@ type EditorHandler struct {
 func (h *EditorHandler) Mount(r chi.Router) {
 	r.Post("/jump", h.jumpHandler)
 	r.Post("/series/rename", h.renameHandler)
+	r.Post("/series/toggle", h.seriesToggleHandler)
 	r.Get("/sponsorblock/{videoID}", h.sbGetHandler)
 	r.Post("/sponsorblock/{videoID}", h.sbPostHandler)
 }
@@ -39,10 +42,37 @@ func (h *EditorHandler) jumpHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	frag := h.channel.CurrentFragment()
+	seg := h.channel.CurrentSegment()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.VideoList(h.channel.AllSeries(), h.channel.State(), frag.Source, frag.Start, h.jellyfin.URL).Render(r.Context(), w); err != nil {
+	if err := components.VideoList(h.channel.AllSeries(), h.channel.State(), seg.Source, seg.Clip.Start, h.jellyfin.URL).Render(r.Context(), w); err != nil {
 		h.logger.Error("render video list", err)
+	}
+}
+
+func (h *EditorHandler) seriesToggleHandler(w http.ResponseWriter, r *http.Request) {
+	seriesID := r.FormValue("series_id")
+	if seriesID == "" {
+		http.Error(w, "missing series_id", http.StatusBadRequest)
+		return
+	}
+	if err := h.channel.ToggleSeriesActive(seriesID); err != nil {
+		h.logger.Error("toggle series active", err)
+	}
+	var sr *channel.Series
+	for _, s := range h.channel.AllSeries() {
+		if s.ID == seriesID {
+			sr = s
+			break
+		}
+	}
+	if sr == nil {
+		http.Error(w, "series not found", http.StatusNotFound)
+		return
+	}
+	seg := h.channel.CurrentSegment()
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := components.SeriesSection(sr, h.channel.State(), seg.Source, seg.Clip.Start, h.jellyfin.URL).Render(r.Context(), w); err != nil {
+		h.logger.Error("render series section", err)
 	}
 }
 
@@ -89,7 +119,7 @@ func (h *EditorHandler) sbPostHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid form", http.StatusBadRequest)
 		return
 	}
-	cuts := make([]channel.CutRange, 0, len(r.Form["cuts"]))
+	cuts := make([]mutation.CutRange, 0, len(r.Form["cuts"]))
 	for _, s := range r.Form["cuts"] {
 		parts := strings.SplitN(s, ",", 2)
 		if len(parts) != 2 {
@@ -97,7 +127,7 @@ func (h *EditorHandler) sbPostHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		start, _ := strconv.ParseFloat(parts[0], 64)
 		end, _ := strconv.ParseFloat(parts[1], 64)
-		cuts = append(cuts, channel.CutRange{
+		cuts = append(cuts, mutation.CutRange{
 			Start: time.Duration(start * float64(time.Second)).Truncate(time.Second),
 			End:   time.Duration(end * float64(time.Second)).Truncate(time.Second),
 		})

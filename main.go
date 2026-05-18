@@ -44,7 +44,7 @@ func main() {
 	serPaths := make(map[string]string, len(serFiles))
 	for i, sf := range serFiles {
 		series[i] = sf.Series
-		serPaths[sf.Series.ID()] = sf.Path
+		serPaths[sf.Series.ID] = sf.Path
 	}
 	schedule := channel.NewSchedule(series...)
 	currentState := store.LoadState(cfg.StatePath, schedule)
@@ -52,17 +52,11 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	saveSeries := func(id string, s *channel.Series) error {
-		return store.SaveSeries(serPaths[id], s)
-	}
-	saveState := func() error {
-		return store.SaveState(cfg.StatePath, currentState)
-	}
-
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
-	ch := channel.NewChannel(schedule, currentState, saveSeries, saveState)
-	api.OpenChannel(r, ch, cfg.Player, cfg.Jellyfin, logger)
+	ch := channel.NewChannel(schedule, currentState)
+	cs := store.NewChannelStore(ch, serPaths, cfg.StatePath)
+	api.OpenChannel(r, cs, cfg.Player, cfg.Jellyfin, logger)
 
 	store.AutoSave(ctx, cfg.StatePath, currentState, 10*time.Minute)
 

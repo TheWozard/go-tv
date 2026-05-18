@@ -77,8 +77,7 @@ func main() {
 	}
 
 	path := filepath.Join(*seriesDir, slugify(name)+".json")
-	season := channel.Season{Name: name, Episodes: episodes}
-	ser := channel.NewSeries(name, season)
+	ser := channel.NewSeries(name, channel.LoopMode, channel.NewSeason(name, episodes...))
 	if err := store.SaveSeries(path, ser); err != nil {
 		slog.Error("failed to save series", "err", err)
 		os.Exit(1)
@@ -87,11 +86,11 @@ func main() {
 }
 
 func toEpisode(e ytInfo) channel.Episode {
-	v := channel.Episode{Source: channel.NewYoutubeSource(e.ID), Title: e.Title}
+	length := time.Duration(0)
 	if e.Duration != nil && *e.Duration > 0 {
-		v.Length = time.Duration(*e.Duration * float64(time.Second)).Truncate(time.Second)
+		length = time.Duration(*e.Duration * float64(time.Second)).Truncate(time.Second)
 	}
-	return v
+	return channel.NewEpisode(channel.NewYoutubeSource(e.ID), length).WithTitle(e.Title)
 }
 
 // fetch runs yt-dlp and returns one ytInfo per video.
