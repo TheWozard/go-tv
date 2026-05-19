@@ -32,19 +32,28 @@ templ SeriesSection(ser *channel.Series, state *channel.State, active channel.So
 	<li class={ "series-item", templ.KV("active-series", isActiveSeries), templ.KV("inactive-series", !seriesActive) } id={ "series-" + ser.ID } data-series-name={ ser.ID }>
 		<div class="series-header">
 			<span class="series-title">{ ser.Name }</span>
-			<button
-				class={ "series-active-btn", templ.KV("is-inactive", !seriesActive) }
-				hx-post="/api/series/toggle"
-				hx-vals={ toggleVals(ser.ID) }
-				hx-target={ "#series-" + ser.ID }
-				hx-swap="outerHTML"
-			>
-				if seriesActive {
-					active
-				} else {
-					inactive
-				}
-			</button>
+			<div class="series-header-actions">
+				<button
+					class={ "series-active-btn", templ.KV("is-inactive", !seriesActive) }
+					hx-post="/api/series/toggle"
+					hx-vals={ toggleVals(ser.ID) }
+					hx-target={ "#series-" + ser.ID }
+					hx-swap="outerHTML"
+				>
+					if seriesActive {
+						active
+					} else {
+						inactive
+					}
+				</button>
+				<button
+					class={ "series-mode-btn", templ.KV("is-active", ser.Mode == channel.LoopMode) }
+					hx-post="/api/series/mode"
+					hx-vals={ toggleVals(ser.ID) }
+					hx-target={ "#series-" + ser.ID }
+					hx-swap="outerHTML"
+				>loop</button>
+			</div>
 		</div>
 		<ul class="series-seasons" id={ "series-seasons-" + ser.ID }>
 			for _, season := range ser.Seasons {

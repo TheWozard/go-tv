@@ -1,7 +1,6 @@
 package channel
 
 import (
-	"math/rand"
 	"time"
 )
 
@@ -35,8 +34,8 @@ func NewSchedule(series ...*Series) *Schedule {
 
 // CurrentSegmentAt returns the segment that should be playing for source at position.
 // If position is past all clips in the episode, it advances to the next episode
-// according to the series mode. Returns false if there is nothing left to play.
-func (sc *Schedule) CurrentSegmentAt(source Source, position time.Duration, shuffle bool, isActive func(string) bool) (Segment, bool) {
+// within the same series. Returns false if there is nothing left to play.
+func (sc *Schedule) CurrentSegmentAt(source Source, position time.Duration) (Segment, bool) {
 	idx, ok := sc.index[source]
 	if !ok {
 		return Segment{}, false
@@ -45,24 +44,22 @@ func (sc *Schedule) CurrentSegmentAt(source Source, position time.Duration, shuf
 	if clip, ok := ep.ClipAt(position); ok {
 		return Segment{Source: ep.Source, Clip: clip}, true
 	}
-	return sc.nextEpisodeSegment(idx, shuffle, isActive)
+	return sc.Series[idx.series].FirstSegmentFrom(idx.season, idx.episode+1)
 }
 
-// NextSegmentAt returns the next clip boundary after position within source's episode,
-// or the first segment of the next episode if no later clip exists.
-func (sc *Schedule) NextSegmentAt(source Source, position time.Duration, shuffle bool, isActive func(string) bool) (Segment, bool) {
+// NextEpisodeInSeries returns the first segment of the episode immediately after
+// source's episode, staying within the same series. Returns false if source is not
+// in the schedule or no next episode exists (accounting for loop mode).
+func (sc *Schedule) NextEpisodeInSeries(source Source) (Segment, bool) {
 	idx, ok := sc.index[source]
 	if !ok {
 		return Segment{}, false
 	}
-	ep := sc.Series[idx.series].Seasons[idx.season].Episodes[idx.episode]
-	if clip, ok := ep.ClipAfter(position); ok {
-		return Segment{Source: ep.Source, Clip: clip}, true
-	}
-	return sc.nextEpisodeSegment(idx, shuffle, isActive)
+	return sc.Series[idx.series].FirstSegmentFrom(idx.season, idx.episode+1)
 }
 
-func (sc *Schedule) activeSeries(isActive func(string) bool) []*Series {
+// ActiveSeries returns all series for which isActive returns true.
+func (sc *Schedule) ActiveSeries(isActive func(string) bool) []*Series {
 	active := make([]*Series, 0, len(sc.Series))
 	for _, s := range sc.Series {
 		if isActive(s.ID) {
@@ -70,43 +67,6 @@ func (sc *Schedule) activeSeries(isActive func(string) bool) []*Series {
 		}
 	}
 	return active
-}
-
-// nextEpisodeSegment advances past the episode at idx. When shuffle is enabled it picks
-// a random active series and starts from its beginning, unless the completed
-// episode has EpisodeContinueMode, which forces advancement within the current series.
-func (sc *Schedule) nextEpisodeSegment(idx ScheduleIndex, shuffle bool, isActive func(string) bool) (Segment, bool) {
-	sr := sc.Series[idx.series]
-	ep := sr.Seasons[idx.season].Episodes[idx.episode]
-	nextSeason, nextEpisode := idx.season, idx.episode+1
-	if shuffle && ep.Mode != EpisodeContinueMode {
-		active := sc.activeSeries(isActive)
-		if len(active) == 0 {
-			return Segment{}, false
-		}
-		sr = active[rand.Intn(len(active))]
-		nextSeason, nextEpisode = 0, 0
-	}
-	return sr.FirstSegmentFrom(nextSeason, nextEpisode)
-}
-
-// firstActiveFrom returns the first segment of the first active series
-// that appears after the series containing source in the schedule.
-func (sc *Schedule) firstActiveFrom(source Source, isActive func(string) bool) (Segment, bool) {
-	start := 0
-	if idx, ok := sc.index[source]; ok {
-		start = idx.series + 1
-	}
-	for i := start; i < len(sc.Series); i++ {
-		sr := sc.Series[i]
-		if !isActive(sr.ID) {
-			continue
-		}
-		if seg, ok := sr.FirstSegmentFrom(0, 0); ok {
-			return seg, true
-		}
-	}
-	return Segment{}, false
 }
 
 // First returns the first playable segment across all active series.

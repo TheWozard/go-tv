@@ -51,8 +51,8 @@ func NewAnonymousSeries(mode SeriesMode, seasons ...Season) *Series {
 
 // FirstSegmentFrom returns the first playable segment starting from (seasonIdx, episodeIdx).
 //
-// In LoopMode, once the remaining seasons are exhausted the search wraps to
-// the seasons before seasonIdx. In all other modes the search stops at the last season.
+// In LoopMode, once the remaining seasons are exhausted the search wraps back to
+// episode 0 of season 0. In all other modes the search stops at the last season.
 func (sr *Series) FirstSegmentFrom(seasonIdx, episodeIdx int) (Segment, bool) {
 	start := min(seasonIdx, len(sr.Seasons))
 	for _, s := range sr.Seasons[start:] {
@@ -62,8 +62,8 @@ func (sr *Series) FirstSegmentFrom(seasonIdx, episodeIdx int) (Segment, bool) {
 		episodeIdx = 0
 	}
 	if sr.Mode == LoopMode {
-		for _, s := range sr.Seasons[:start] {
-			if seg, ok := s.FirstSegmentFrom(episodeIdx); ok {
+		for _, s := range sr.Seasons {
+			if seg, ok := s.FirstSegmentFrom(0); ok {
 				return seg, true
 			}
 		}

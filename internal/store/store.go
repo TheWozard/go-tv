@@ -105,7 +105,7 @@ func LoadState(path string, schedule *channel.Schedule) *channel.State {
 
 	state := fromStateDTO(dto)
 	src, pos := state.Get()
-	if current, ok := schedule.CurrentSegmentAt(src, pos, state.Shuffle, state.IsActive); ok {
+	if current, ok := schedule.CurrentSegmentAt(src, pos); ok {
 		if !current.Source.Equal(src) || current.Clip.Start > pos {
 			state.Jump(state.ActiveSeries, current.Source, current.Clip.Start)
 		}

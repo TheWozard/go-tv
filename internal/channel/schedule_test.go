@@ -102,7 +102,7 @@ func TestScheduleCurrentSegmentAt(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			seg, ok := tt.schedule.CurrentSegmentAt(tt.source, tt.position, false, func(string) bool { return true })
+			seg, ok := tt.schedule.CurrentSegmentAt(tt.source, tt.position)
 			assert.Equal(t, tt.wantOK, ok)
 			if tt.wantOK {
 				assert.Equal(t, tt.wantSeg, seg)
@@ -111,86 +111,92 @@ func TestScheduleCurrentSegmentAt(t *testing.T) {
 	}
 }
 
-func TestScheduleNextSegmentAt(t *testing.T) {
+func TestScheduleNextEpisodeInSeries(t *testing.T) {
 	tests := []struct {
 		name     string
 		schedule *channel.Schedule
 		source   channel.Source
-		position time.Duration
 		wantSeg  channel.Segment
 		wantOK   bool
 	}{
 		{
 			"source not in schedule",
 			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))),
-			srcB, 0,
+			srcB,
 			channel.Segment{}, false,
 		},
 		{
-			"single season Single mode: no clip boundary returns false",
+			"single episode Single mode: no next episode returns false",
 			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))),
-			srcA, 30 * time.Second,
+			srcA,
 			channel.Segment{}, false,
 		},
 		{
-			"single season with clips: returns next boundary within season",
+			"two episodes: returns second episode",
 			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(
-				channel.NewEpisode(srcA, 90*time.Second,
-					channel.NewClip(0, 30*time.Second),
-					channel.NewClip(60*time.Second, 90*time.Second),
-				),
+				channel.NewEpisode(srcA, time.Minute),
+				channel.NewEpisode(srcB, time.Minute),
 			))),
-			srcA, 5 * time.Second,
-			channel.Segment{Source: srcA, Clip: channel.NewClip(60*time.Second, 90*time.Second)},
-			true,
-		},
-		{
-			"two seasons: past last clip advances to next season",
-			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single,
-				channel.NewAnonymousSeason(channel.NewEpisode(srcA, 90*time.Second,
-					channel.NewClip(0, 30*time.Second),
-					channel.NewClip(60*time.Second, 90*time.Second),
-				)),
-				channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)),
-			)),
-			srcA, 65 * time.Second,
+			srcA,
 			channel.Segment{Source: srcB, Clip: channel.NewClip(0, time.Minute)},
 			true,
 		},
 		{
-			"Single mode: no more clips in last season returns false",
+			"two seasons: end of first season advances to second",
 			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single,
 				channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)),
 				channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)),
 			)),
-			srcB, 30 * time.Second,
+			srcA,
+			channel.Segment{Source: srcB, Clip: channel.NewClip(0, time.Minute)},
+			true,
+		},
+		{
+			"Single mode: no more episodes in last season returns false",
+			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single,
+				channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)),
+				channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)),
+			)),
+			srcB,
 			channel.Segment{}, false,
 		},
 		{
-			"LoopMode: no more clips in last season wraps to first",
+			"LoopMode: no more episodes in last season wraps to first",
 			channel.NewSchedule(channel.NewAnonymousSeries(channel.LoopMode,
 				channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)),
 				channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)),
 			)),
-			srcB, 30 * time.Second,
+			srcB,
 			channel.Segment{Source: srcA, Clip: channel.NewClip(0, time.Minute)},
 			true,
 		},
 		{
-			"LoopMode: wraps to first season skipping exhausted seasons",
+			"LoopMode single season: end of last episode wraps to first",
 			channel.NewSchedule(channel.NewAnonymousSeries(channel.LoopMode,
+				channel.NewAnonymousSeason(
+					channel.NewEpisode(srcA, time.Minute),
+					channel.NewEpisode(srcB, time.Minute),
+				),
+			)),
+			srcB,
+			channel.Segment{Source: srcA, Clip: channel.NewClip(0, time.Minute)},
+			true,
+		},
+		{
+			"three seasons: middle season advances to correct next",
+			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single,
 				channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)),
 				channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)),
 				channel.NewAnonymousSeason(channel.NewEpisode(srcC, time.Minute)),
 			)),
-			srcC, 30 * time.Second,
-			channel.Segment{Source: srcA, Clip: channel.NewClip(0, time.Minute)},
+			srcB,
+			channel.Segment{Source: srcC, Clip: channel.NewClip(0, time.Minute)},
 			true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			seg, ok := tt.schedule.NextSegmentAt(tt.source, tt.position, false, func(string) bool { return true })
+			seg, ok := tt.schedule.NextEpisodeInSeries(tt.source)
 			assert.Equal(t, tt.wantOK, ok)
 			if tt.wantOK {
 				assert.Equal(t, tt.wantSeg, seg)

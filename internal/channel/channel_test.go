@@ -150,6 +150,23 @@ func TestChannelNext(t *testing.T) {
 			wantSeg: channel.Segment{Source: srcA, Clip: channel.NewClip(0, time.Minute)},
 		},
 		{
+			name: "LoopMode single season wraps and series stays active",
+			ch: func() *channel.Channel {
+				sr := channel.NewSeries("Show", channel.LoopMode, channel.NewAnonymousSeason(
+					channel.NewEpisode(srcA, time.Minute),
+					channel.NewEpisode(srcB, time.Minute),
+				))
+				return channel.NewEmptyChannel(channel.NewSchedule(sr))
+			},
+			src:     srcB,
+			pos:     time.Minute,
+			wantSeg: channel.Segment{Source: srcA, Clip: channel.NewClip(0, time.Minute)},
+			check: func(t *testing.T, ch *channel.Channel) {
+				sr := ch.AllSeries()[0]
+				assert.True(t, ch.State().IsActive(sr.ID), "looping series must not be exhausted")
+			},
+		},
+		{
 			name: "unknown source returns error",
 			ch: func() *channel.Channel {
 				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(
@@ -176,9 +193,22 @@ func TestChannelNext(t *testing.T) {
 			wantSeg: channel.Segment{Source: srcB, Clip: channel.NewClip(0, time.Minute)},
 		},
 		{
-			// Shuffle previously skipped episode 0 of the selected
-			// series (nextEpisodeSegment used idx.episode+1=1 after reset).
-			name: "shuffle advances to episode 0 of active series",
+			name: "shuffle same series picked continues from next episode",
+			ch: func() *channel.Channel {
+				epA := channel.NewEpisode(srcA, time.Minute)
+				epB := channel.NewEpisode(srcB, time.Minute)
+				// Only one series so shuffle always picks it; must advance to epB, not restart at epA.
+				srA := channel.NewSeries("ShowA", channel.Defer, channel.NewAnonymousSeason(epA, epB))
+				ch := channel.NewEmptyChannel(channel.NewSchedule(srA))
+				ch.SetShuffle(true)
+				return ch
+			},
+			src:     srcA,
+			pos:     time.Minute,
+			wantSeg: channel.Segment{Source: srcB, Clip: channel.NewClip(0, time.Minute)},
+		},
+		{
+			name: "shuffle exhausts finished series and picks from remaining",
 			ch: func() *channel.Channel {
 				epA := channel.NewEpisode(srcA, time.Minute)
 				epB := channel.NewEpisode(srcB, time.Minute)
@@ -194,7 +224,7 @@ func TestChannelNext(t *testing.T) {
 				assert.False(t, ch.CurrentSegment().Source.IsZero())
 				idA := ch.AllSeries()[0].ID
 				idB := ch.AllSeries()[1].ID
-				assert.True(t, ch.State().IsActive(idA), "ShowA should remain active")
+				assert.False(t, ch.State().IsActive(idA), "ShowA should be exhausted")
 				assert.True(t, ch.State().IsActive(idB), "ShowB should remain active")
 			},
 		},
@@ -345,6 +375,20 @@ func TestChannelToggleSeriesActive(t *testing.T) {
 	assert.False(t, ch.State().IsActive(sr.ID))
 	ch.ToggleSeriesActive(sr.ID)
 	assert.True(t, ch.State().IsActive(sr.ID))
+}
+
+func TestChannelToggleSeriesActivePicksNewWhenCurrentlyActive(t *testing.T) {
+	srA := channel.NewSeries("ShowA", channel.Single, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))
+	srB := channel.NewSeries("ShowB", channel.Single, channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)))
+	ch := channel.NewEmptyChannel(channel.NewSchedule(srA, srB))
+
+	ch.Progress(srcA, 0)
+	require.Equal(t, srA.ID, ch.State().ActiveSeries)
+
+	ch.ToggleSeriesActive(srA.ID)
+
+	assert.False(t, ch.State().IsActive(srA.ID))
+	assert.Equal(t, srB.ID, ch.State().ActiveSeries, "should switch to a remaining active series")
 }
 
 func TestChannelSeriesStateOf(t *testing.T) {

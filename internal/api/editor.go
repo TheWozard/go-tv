@@ -28,6 +28,7 @@ func (h *EditorHandler) Mount(r chi.Router) {
 	r.Post("/jump", h.jumpHandler)
 	r.Post("/series/rename", h.renameHandler)
 	r.Post("/series/toggle", h.seriesToggleHandler)
+	r.Post("/series/mode", h.seriesModeHandler)
 	r.Post("/shuffle", h.shuffleToggleHandler)
 	r.Post("/episode/mode", h.episodeModeHandler)
 	r.Get("/sponsorblock/{videoID}", h.sbGetHandler)
@@ -69,6 +70,39 @@ func (h *EditorHandler) seriesToggleHandler(w http.ResponseWriter, r *http.Reque
 	}
 	if sr == nil {
 		http.Error(w, "series not found", http.StatusNotFound)
+		return
+	}
+	seg := h.channel.CurrentSegment()
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := components.SeriesSection(sr, h.channel.State(), seg.Source, seg.Clip.Start, h.jellyfin.URL).Render(r.Context(), w); err != nil {
+		h.logger.Error("render series section", err)
+	}
+}
+
+func (h *EditorHandler) seriesModeHandler(w http.ResponseWriter, r *http.Request) {
+	seriesID := r.FormValue("series_id")
+	if seriesID == "" {
+		http.Error(w, "missing series_id", http.StatusBadRequest)
+		return
+	}
+	var sr *channel.Series
+	for _, s := range h.channel.AllSeries() {
+		if s.ID == seriesID {
+			sr = s
+			break
+		}
+	}
+	if sr == nil {
+		http.Error(w, "series not found", http.StatusNotFound)
+		return
+	}
+	newMode := channel.LoopMode
+	if sr.Mode == channel.LoopMode {
+		newMode = channel.Defer
+	}
+	if err := h.channel.SetSeriesMode(seriesID, newMode); err != nil {
+		h.logger.Error("set series mode", err)
+		http.Error(w, "failed to save", http.StatusInternalServerError)
 		return
 	}
 	seg := h.channel.CurrentSegment()

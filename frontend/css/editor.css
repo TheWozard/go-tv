@@ -123,6 +123,36 @@ header a:hover {
   color: #7a5a2a;
 }
 
+.series-header-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.series-mode-btn {
+  background: none;
+  border: 1px solid #444;
+  color: #666;
+  cursor: pointer;
+  font-size: .6rem;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  transition: opacity .15s;
+}
+
+.series-mode-btn:hover {
+  opacity: .7;
+}
+
+.series-mode-btn.is-active {
+  border-color: #2a4a7c;
+  color: #4a90d9;
+}
+
 .series-item.inactive-series > .series-seasons {
   opacity: .4;
 }

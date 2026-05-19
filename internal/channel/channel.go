@@ -2,8 +2,11 @@ package channel
 
 import (
 	"errors"
+	"math/rand/v2"
 	"time"
 )
+
+var errNoNextSegment = errors.New("no next segment")
 
 // Channel is the runtime orchestrator that pairs a Schedule with a playback State.
 // It exposes the four core player operations — CurrentSegment, Progress, Next, Jump —
@@ -39,7 +42,7 @@ func (c *Channel) CurrentSegment() Segment {
 		seg, _ := c.schedule.First(c.state.IsActive)
 		return seg
 	}
-	seg, ok := c.schedule.CurrentSegmentAt(src, pos, c.state.Shuffle, c.state.IsActive)
+	seg, ok := c.schedule.CurrentSegmentAt(src, pos)
 	if !ok {
 		seg, _ = c.schedule.First(c.state.IsActive)
 	}
@@ -56,21 +59,47 @@ func (c *Channel) Progress(source Source, position time.Duration) {
 }
 
 // Next advances to the next segment after source at position.
-// When the current series is exhausted it marks that series inactive and
-// continues with the next active series in schedule order.
+// If another clip exists within the current episode it advances to that clip.
+// Otherwise, in shuffle mode a random active series is chosen; in ordered mode
+// the series advances sequentially, exhausting the current series when done.
 // Returns an error when source is unknown or no further segments exist.
 func (c *Channel) Next(source Source, position time.Duration) error {
-	seg, ok := c.schedule.NextSegmentAt(source, position, c.state.Shuffle, c.state.IsActive)
-	if !ok {
+	ep := c.schedule.FindEpisode(source)
+	if ep == nil {
+		return errors.New("unknown source")
+	}
+	if clip, ok := ep.ClipAfter(position); ok {
 		sr := c.schedule.SeriesOf(source)
-		if sr == nil {
-			return errors.New("no next segment")
+		c.state.Update(sr, source, clip.Start)
+		return nil
+	}
+	err := c.orderedNext(source)
+	if (c.state.Shuffle && ep.Mode != EpisodeContinueMode) || errors.Is(err, errNoNextSegment) {
+		return c.shuffleActive()
+	}
+	return err
+}
+
+// shuffleActive picks a random active series and makes it active.
+func (c *Channel) shuffleActive() error {
+	active := c.schedule.ActiveSeries(c.state.IsActive)
+	if len(active) == 0 {
+		return errors.New("no active series")
+	}
+	picked := active[rand.IntN(len(active))]
+	c.state.ActiveSeries = picked.ID
+	return nil
+}
+
+// orderedNext advances to the next episode within the current series.
+// Exhausts the series and returns errNoNextSegment when no further episodes exist.
+func (c *Channel) orderedNext(source Source) error {
+	seg, ok := c.schedule.NextEpisodeInSeries(source)
+	if !ok {
+		if sr := c.schedule.SeriesOf(source); sr != nil {
+			c.state.Exhaust(sr.ID)
 		}
-		c.state.Exhaust(sr.ID)
-		seg, ok = c.schedule.firstActiveFrom(source, c.state.IsActive)
-		if !ok {
-			return errors.New("no next segment")
-		}
+		return errNoNextSegment
 	}
 	sr := c.schedule.SeriesOf(seg.Source)
 	if sr == nil {
@@ -88,12 +117,23 @@ func (c *Channel) Jump(source Source, position time.Duration) error {
 	if sr == nil {
 		return errors.New("source not found in schedule")
 	}
-	seg, ok := c.schedule.CurrentSegmentAt(source, position, c.state.Shuffle, c.state.IsActive)
+	seg, ok := c.schedule.CurrentSegmentAt(source, position)
 	if !ok {
 		return errors.New("invalid position for source")
 	}
 	c.state.Jump(sr.ID, seg.Source, seg.Clip.Start)
 	return nil
+}
+
+// SetSeriesMode sets the playback mode for the series with the given ID.
+func (c *Channel) SetSeriesMode(seriesID string, mode SeriesMode) error {
+	for _, sr := range c.schedule.Series {
+		if sr.ID == seriesID {
+			sr.Mode = mode
+			return nil
+		}
+	}
+	return errors.New("series not found")
 }
 
 // AllSeries returns every series in the schedule.
@@ -128,9 +168,14 @@ func (c *Channel) SetShuffle(shuffle bool) {
 
 // ToggleSeriesActive flips the active/inactive status of the named series.
 // Inactive series are skipped by Next and excluded from shuffle selection.
+// If the series being deactivated is the currently active series, a new active
+// series is picked from the remaining active series.
 func (c *Channel) ToggleSeriesActive(seriesID string) {
 	if c.state.IsActive(seriesID) {
 		c.state.SetInactive(seriesID)
+		if c.state.ActiveSeries == seriesID {
+			c.shuffleActive()
+		}
 	} else {
 		c.state.SetActive(seriesID)
 	}
