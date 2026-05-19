@@ -68,12 +68,12 @@ func (c *Channel) Next(source Source, position time.Duration) error {
 	if ep == nil {
 		return errors.New("unknown source")
 	}
+	series := c.schedule.SeriesOf(source)
 	if clip, ok := ep.ClipAfter(position); ok {
-		sr := c.schedule.SeriesOf(source)
-		c.state.Activate(sr.ID, source, clip.Start)
+		c.state.SetPosition(series.ID, source, clip.Start)
 		return nil
 	}
-	err := c.orderedNext(source)
+	err := c.orderedNext(series.ID, source)
 	if (c.state.Shuffle && ep.Mode != EpisodeContinueMode) || errors.Is(err, errNoNextSegment) {
 		return c.shuffleActive()
 	}
@@ -93,19 +93,13 @@ func (c *Channel) shuffleActive() error {
 
 // orderedNext advances to the next episode within the current series.
 // Exhausts the series and returns errNoNextSegment when no further episodes exist.
-func (c *Channel) orderedNext(source Source) error {
+func (c *Channel) orderedNext(id string, source Source) error {
 	seg, ok := c.schedule.NextEpisodeInSeries(source)
 	if !ok {
-		if sr := c.schedule.SeriesOf(source); sr != nil {
-			c.state.Exhaust(sr.ID)
-		}
+		c.state.Exhaust(id)
 		return errNoNextSegment
 	}
-	sr := c.schedule.SeriesOf(seg.Source)
-	if sr == nil {
-		return errors.New("segment series not found")
-	}
-	c.state.Activate(sr.ID, seg.Source, seg.Clip.Start)
+	c.state.SetPosition(id, seg.Source, seg.Clip.Start)
 	return nil
 }
 
