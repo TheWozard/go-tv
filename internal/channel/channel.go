@@ -53,7 +53,7 @@ func (c *Channel) CurrentSegment() Segment {
 // Called periodically by the player to persist where the viewer is within the episode.
 func (c *Channel) Progress(source Source, position time.Duration) {
 	sr := c.schedule.SeriesOf(source)
-	if sr != nil {
+	if sr != nil && (c.state.ActiveSeries == "" || sr.ID == c.state.ActiveSeries) {
 		c.state.Update(sr, source, position)
 	}
 }
@@ -174,7 +174,9 @@ func (c *Channel) ToggleSeriesActive(seriesID string) {
 	if c.state.IsActive(seriesID) {
 		c.state.SetInactive(seriesID)
 		if c.state.ActiveSeries == seriesID {
-			c.shuffleActive()
+			if err := c.shuffleActive(); err != nil {
+				c.state.ActiveSeries = ""
+			}
 		}
 	} else {
 		c.state.SetActive(seriesID)
