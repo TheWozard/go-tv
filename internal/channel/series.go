@@ -9,7 +9,7 @@ import (
 type SeriesMode string
 
 const (
-	// OnceMode is the default mode (zero value). Playback stops after the last season.
+	// OnceMode is the default mode (zero value). The series is exhausted after the last episode and the next active series takes over.
 	OnceMode SeriesMode = ""
 	// LoopMode wraps back to the first season after the last season finishes.
 	LoopMode SeriesMode = "loop"
@@ -42,7 +42,7 @@ func NewSeriesWithID(id, name string, mode SeriesMode, seasons ...Season) *Serie
 	return &Series{ID: id, Name: name, Mode: mode, Seasons: seasons}
 }
 
-// NewAnonymousSeries constructs a Series with no name. Used in tests.
+// NewAnonymousSeries constructs a Series with a placeholder name. Used in tests.
 func NewAnonymousSeries(mode SeriesMode, seasons ...Season) *Series {
 	return NewSeries("anonymous", mode, seasons...)
 }

@@ -391,6 +391,29 @@ func TestChannelToggleSeriesActivePicksNewWhenCurrentlyActive(t *testing.T) {
 	assert.Equal(t, srB.ID, ch.State().ActiveSeries, "should switch to a remaining active series")
 }
 
+// TestShuffleInitializesNewSeriesState verifies that when shuffleActive picks a series
+// that has never been played, it initialises the series to its first episode.
+// Without this, CurrentSegment falls back to schedule.First() which may return the
+// wrong episode (e.g. the current episode of a still-active earlier series).
+func TestShuffleInitializesNewSeriesState(t *testing.T) {
+	srA := channel.NewSeries("ShowA", channel.OnceMode, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))
+	srB := channel.NewSeries("ShowB", channel.OnceMode, channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)))
+	// srA is first in schedule order; srB has no prior playback state.
+	ch := channel.NewEmptyChannel(channel.NewSchedule(srA, srB))
+
+	require.NoError(t, ch.Jump(srcA, 0))
+
+	// Deactivating the current series forces shuffleActive to pick srB (only remaining active).
+	ch.ToggleSeriesActive(srA.ID)
+
+	// srB must be active and its state must be initialised to its first episode.
+	assert.Equal(t, srB.ID, ch.State().ActiveSeries)
+	gotSrc, gotPos := ch.SeriesStateOf(srcB)
+	assert.Equal(t, srcB, gotSrc, "new series must be initialised to its first episode source")
+	assert.Equal(t, time.Duration(0), gotPos)
+	assert.Equal(t, channel.Segment{Source: srcB, Clip: channel.NewClip(0, time.Minute)}, ch.CurrentSegment())
+}
+
 func TestChannelSeriesStateOf(t *testing.T) {
 	tests := []struct {
 		name    string

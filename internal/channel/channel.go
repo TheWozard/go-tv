@@ -70,7 +70,7 @@ func (c *Channel) Next(source Source, position time.Duration) error {
 	}
 	series := c.schedule.SeriesOf(source)
 	if clip, ok := ep.ClipAfter(position); ok {
-		c.state.SetPosition(series.ID, source, clip.Start)
+		c.state.activateIfCurrent(series.ID, source, clip.Start)
 		return nil
 	}
 	err := c.orderedNext(series.ID, source)
@@ -81,13 +81,22 @@ func (c *Channel) Next(source Source, position time.Duration) error {
 }
 
 // shuffleActive picks a random active series and makes it active.
+// If the picked series has no stored playback position, it is initialized
+// to its first episode so that CurrentSegment never falls back to the
+// schedule-order first episode of a different series.
 func (c *Channel) shuffleActive() error {
 	active := c.schedule.ActiveSeries(c.state.IsActive)
 	if len(active) == 0 {
 		return errors.New("no active series")
 	}
 	picked := active[rand.IntN(len(active))]
-	c.state.ActiveSeries = picked.ID
+	src, pos := c.state.GetSeriesState(picked.ID)
+	if src.IsZero() {
+		if seg, ok := picked.FirstSegmentFrom(0, 0); ok {
+			src, pos = seg.Source, seg.Clip.Start
+		}
+	}
+	c.state.Activate(picked.ID, src, pos)
 	return nil
 }
 
@@ -99,7 +108,7 @@ func (c *Channel) orderedNext(id string, source Source) error {
 		c.state.Exhaust(id)
 		return errNoNextSegment
 	}
-	c.state.SetPosition(id, seg.Source, seg.Clip.Start)
+	c.state.activateIfCurrent(id, seg.Source, seg.Clip.Start)
 	return nil
 }
 

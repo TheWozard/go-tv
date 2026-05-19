@@ -3,11 +3,12 @@ package channel
 import "time"
 
 // State tracks which series is currently playing and where playback is within it.
-// It also records which series have been fully exhausted (inactive).
+// It also records which series are inactive, either because they were exhausted
+// by playback or manually deactivated by the user.
 //
 // State is keyed by Series.ID. All series are active by default;
-// a series becomes inactive when Channel.Next exhausts it, and can be reactivated
-// via ToggleSeriesActive.
+// a series becomes inactive when Channel.Next exhausts it or when
+// ToggleSeriesActive deactivates it.
 type State struct {
 	// ActiveSeries is the ID of the series currently being played.
 	ActiveSeries string
@@ -51,7 +52,7 @@ func (s *State) SetActive(id string) {
 }
 
 // IsActive reports whether a series is eligible for playback.
-// Series are active by default; only explicitly finished ones are inactive.
+// Series are active by default; only exhausted or user-deactivated ones are inactive.
 func (s *State) IsActive(id string) bool {
 	return !s.inactive[id]
 }
@@ -93,17 +94,28 @@ func (s *State) SetSeriesState(id string, src Source, pos time.Duration) {
 }
 
 // SetPosition records the current playback position for a series without
-// changing which series is active. Use from Progress to avoid stale updates
-// overriding an in-flight Jump or Next.
+// changing which series is active. Use wherever ActiveSeries must not change,
+// e.g. Progress and stale Next calls that should not override a Jump.
 func (s *State) SetPosition(seriesID string, src Source, pos time.Duration) {
 	s.series[seriesID] = SeriesState{Source: src, Position: pos}
 }
 
 // Activate sets the active series and records its current playback position.
-// Use from Next and Jump when the playing series intentionally changes.
+// Use when the playing series intentionally changes (Jump, shuffleActive, first Next).
 func (s *State) Activate(seriesID string, src Source, pos time.Duration) {
 	s.ActiveSeries = seriesID
 	s.series[seriesID] = SeriesState{Source: src, Position: pos}
+}
+
+// activateIfCurrent calls Activate when no series is active yet, establishing
+// the active series for the first time. Otherwise it calls SetPosition so that
+// a stale Next from a previously-playing series cannot override a Jump.
+func (s *State) activateIfCurrent(id string, src Source, pos time.Duration) {
+	if s.ActiveSeries == "" {
+		s.Activate(id, src, pos)
+	} else {
+		s.SetPosition(id, src, pos)
+	}
 }
 
 // EachSeriesState calls fn for every series with persisted state.
