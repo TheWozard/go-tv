@@ -38,21 +38,21 @@ func (cs *ChannelStore) Jump(source channel.Source, position time.Duration) erro
 }
 
 func (cs *ChannelStore) RenameSeason(seriesID, oldName, newName string) error {
-	if err := mutation.RenameSeason(cs.Channel, seriesID, oldName, newName); err != nil {
+	if err := mutation.RenameSeason(cs.Channel.Schedule(), seriesID, oldName, newName); err != nil {
 		return err
 	}
 	return cs.saveSeries(seriesID)
 }
 
 func (cs *ChannelStore) ReorderSeries(seriesID string, orders []mutation.SeasonOrder) error {
-	if err := mutation.ReorderSeries(cs.Channel, seriesID, orders); err != nil {
+	if err := mutation.ReorderSeries(cs.Channel.Schedule(), seriesID, orders); err != nil {
 		return err
 	}
 	return cs.saveSeries(seriesID)
 }
 
-func (cs *ChannelStore) ApplyCuts(videoID string, cuts []mutation.CutRange) (*channel.Episode, error) {
-	ep, err := mutation.ApplyCuts(cs.Channel, videoID, cuts)
+func (cs *ChannelStore) ApplyCuts(source channel.Source, cuts []mutation.CutRange) (*channel.Episode, error) {
+	ep, err := mutation.ApplyCuts(cs.Channel.Schedule(), source, cuts)
 	if err != nil {
 		return nil, err
 	}
@@ -71,8 +71,8 @@ func (cs *ChannelStore) ToggleSeriesActive(seriesID string) error {
 	return cs.saveState()
 }
 
-func (cs *ChannelStore) SetEpisodeMode(videoID string, mode channel.EpisodeMode) (*channel.Episode, error) {
-	ep, err := mutation.SetEpisodeMode(cs.Channel, videoID, mode)
+func (cs *ChannelStore) SetEpisodeMode(source channel.Source, mode channel.EpisodeMode) (*channel.Episode, error) {
+	ep, err := mutation.SetEpisodeMode(cs.Channel.Schedule(), source, mode)
 	if err != nil {
 		return nil, err
 	}

@@ -22,8 +22,8 @@ type CutRange struct {
 }
 
 // RenameSeason renames a season within the named series (by series ID).
-func RenameSeason(c *channel.Channel, seriesID, oldName, newName string) error {
-	sr := findSeriesByID(c, seriesID)
+func RenameSeason(sc *channel.Schedule, seriesID, oldName, newName string) error {
+	sr := findSeriesByID(sc, seriesID)
 	if sr == nil {
 		return errors.New("series not found")
 	}
@@ -37,8 +37,8 @@ func RenameSeason(c *channel.Channel, seriesID, oldName, newName string) error {
 }
 
 // ReorderSeries reorders the seasons and episodes of the named series (by series ID).
-func ReorderSeries(c *channel.Channel, seriesID string, orders []SeasonOrder) error {
-	sr := findSeriesByID(c, seriesID)
+func ReorderSeries(sc *channel.Schedule, seriesID string, orders []SeasonOrder) error {
+	sr := findSeriesByID(sc, seriesID)
 	if sr == nil {
 		return errors.New("series not found")
 	}
@@ -61,14 +61,14 @@ func ReorderSeries(c *channel.Channel, seriesID string, orders []SeasonOrder) er
 		newSeasons = append(newSeasons, channel.NewSeason(order.Name, eps...))
 	}
 	sr.Seasons = newSeasons
-	c.Schedule().RebuildIndex()
+	sc.RebuildIndex()
 	return nil
 }
 
-// SetEpisodeMode sets the EpisodeMode on the episode identified by videoID.
+// SetEpisodeMode sets the EpisodeMode on the episode identified by source.
 // Returns a pointer to the updated episode, or an error if not found.
-func SetEpisodeMode(c *channel.Channel, videoID string, mode channel.EpisodeMode) (*channel.Episode, error) {
-	ep := findEpisode(c, videoID)
+func SetEpisodeMode(sc *channel.Schedule, source channel.Source, mode channel.EpisodeMode) (*channel.Episode, error) {
+	ep := sc.FindEpisode(source)
 	if ep == nil {
 		return nil, errors.New("episode not found")
 	}
@@ -76,10 +76,10 @@ func SetEpisodeMode(c *channel.Channel, videoID string, mode channel.EpisodeMode
 	return ep, nil
 }
 
-// ApplyCuts applies sponsorblock cut ranges to an episode identified by videoID.
+// ApplyCuts applies sponsorblock cut ranges to the episode identified by source.
 // It returns a pointer to the updated episode.
-func ApplyCuts(c *channel.Channel, videoID string, cuts []CutRange) (*channel.Episode, error) {
-	ep := findEpisode(c, videoID)
+func ApplyCuts(sc *channel.Schedule, source channel.Source, cuts []CutRange) (*channel.Episode, error) {
+	ep := sc.FindEpisode(source)
 	if ep == nil {
 		return nil, errors.New("episode not found")
 	}
@@ -111,19 +111,9 @@ func cutsToClips(length time.Duration, cuts []CutRange) []channel.Clip {
 	return clips
 }
 
-func findEpisode(c *channel.Channel, videoID string) *channel.Episode {
-	for _, kind := range []channel.SourceKind{channel.SourceKindYoutube, channel.SourceKindJellyfin, channel.SourceKindTest} {
-		if src, ok := channel.NewValidatedSource(kind, videoID); ok {
-			if ep := c.Schedule().FindEpisode(src); ep != nil {
-				return ep
-			}
-		}
-	}
-	return nil
-}
 
-func findSeriesByID(c *channel.Channel, id string) *channel.Series {
-	for _, sr := range c.AllSeries() {
+func findSeriesByID(sc *channel.Schedule, id string) *channel.Series {
+	for _, sr := range sc.Series {
 		if sr.ID == id {
 			return sr
 		}

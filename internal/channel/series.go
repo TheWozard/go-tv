@@ -9,12 +9,10 @@ import (
 type SeriesMode string
 
 const (
-	// Defer is the default mode (zero value). Playback stops after the last season.
-	Defer SeriesMode = ""
+	// OnceMode is the default mode (zero value). Playback stops after the last season.
+	OnceMode SeriesMode = ""
 	// LoopMode wraps back to the first season after the last season finishes.
 	LoopMode SeriesMode = "loop"
-	// Single plays through all seasons once and then stops.
-	Single SeriesMode = "single"
 )
 
 // Series is a named collection of Seasons with a shared playback mode.

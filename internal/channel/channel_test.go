@@ -19,7 +19,7 @@ func TestChannelCurrentSegment(t *testing.T) {
 		{
 			"empty state falls back to first segment",
 			func() *channel.Channel {
-				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(
+				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(
 					channel.NewEpisode(srcA, time.Minute),
 				))))
 			},
@@ -28,7 +28,7 @@ func TestChannelCurrentSegment(t *testing.T) {
 		{
 			"state mid-episode returns that episode's segment",
 			func() *channel.Channel {
-				sc := channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute))))
+				sc := channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute))))
 				return channel.NewChannel(sc, channel.NewStateFor("", srcA, 30*time.Second))
 			},
 			channel.Segment{Source: srcA, Clip: channel.NewClip(0, time.Minute)},
@@ -40,7 +40,7 @@ func TestChannelCurrentSegment(t *testing.T) {
 					channel.NewClip(0, 30*time.Second),
 					channel.NewClip(60*time.Second, 90*time.Second),
 				)
-				sc := channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(ep)))
+				sc := channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(ep)))
 				return channel.NewChannel(sc, channel.NewStateFor("", srcA, 45*time.Second))
 			},
 			channel.Segment{Source: srcA, Clip: channel.NewClip(60*time.Second, 90*time.Second)},
@@ -48,7 +48,7 @@ func TestChannelCurrentSegment(t *testing.T) {
 		{
 			"unknown source falls back to first segment",
 			func() *channel.Channel {
-				sc := channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute))))
+				sc := channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute))))
 				return channel.NewChannel(sc, channel.NewStateFor("", channel.NewTestSource("unknown"), 0))
 			},
 			channel.Segment{Source: srcA, Clip: channel.NewClip(0, time.Minute)},
@@ -78,7 +78,7 @@ func TestChannelNext(t *testing.T) {
 					channel.NewClip(0, 30*time.Second),
 					channel.NewClip(60*time.Second, 90*time.Second),
 				)
-				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(ep))))
+				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(ep))))
 			},
 			src:     srcA,
 			pos:     30 * time.Second,
@@ -87,7 +87,7 @@ func TestChannelNext(t *testing.T) {
 		{
 			name: "advances to next episode",
 			ch: func() *channel.Channel {
-				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(
+				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(
 					channel.NewEpisode(srcA, time.Minute),
 					channel.NewEpisode(srcB, time.Minute),
 				))))
@@ -99,7 +99,7 @@ func TestChannelNext(t *testing.T) {
 		{
 			name: "advances to next season",
 			ch: func() *channel.Channel {
-				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.Single,
+				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode,
 					channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)),
 					channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)),
 				)))
@@ -111,8 +111,8 @@ func TestChannelNext(t *testing.T) {
 		{
 			name: "end of series advances to next series",
 			ch: func() *channel.Channel {
-				srA := channel.NewSeries("ShowA", channel.Single, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))
-				srB := channel.NewSeries("ShowB", channel.Single, channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)))
+				srA := channel.NewSeries("ShowA", channel.OnceMode, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))
+				srB := channel.NewSeries("ShowB", channel.OnceMode, channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)))
 				return channel.NewEmptyChannel(channel.NewSchedule(srA, srB))
 			},
 			src:     srcA,
@@ -126,7 +126,7 @@ func TestChannelNext(t *testing.T) {
 		{
 			name: "all series exhausted returns error",
 			ch: func() *channel.Channel {
-				sr := channel.NewSeries("Show", channel.Single, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))
+				sr := channel.NewSeries("Show", channel.OnceMode, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))
 				return channel.NewEmptyChannel(channel.NewSchedule(sr))
 			},
 			src:     srcA,
@@ -169,7 +169,7 @@ func TestChannelNext(t *testing.T) {
 		{
 			name: "unknown source returns error",
 			ch: func() *channel.Channel {
-				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(
+				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(
 					channel.NewEpisode(srcA, time.Minute),
 				))))
 			},
@@ -182,8 +182,8 @@ func TestChannelNext(t *testing.T) {
 			ch: func() *channel.Channel {
 				epA := channel.NewEpisode(srcA, time.Minute).WithMode(channel.EpisodeContinueMode)
 				epB := channel.NewEpisode(srcB, time.Minute)
-				srA := channel.NewSeries("ShowA", channel.Defer, channel.NewAnonymousSeason(epA, epB))
-				srOther := channel.NewSeries("Other", channel.Defer, channel.NewAnonymousSeason(channel.NewEpisode(srcC, time.Minute)))
+				srA := channel.NewSeries("ShowA", channel.OnceMode, channel.NewAnonymousSeason(epA, epB))
+				srOther := channel.NewSeries("Other", channel.OnceMode, channel.NewAnonymousSeason(channel.NewEpisode(srcC, time.Minute)))
 				ch := channel.NewEmptyChannel(channel.NewSchedule(srA, srOther))
 				ch.SetShuffle(true)
 				return ch
@@ -198,7 +198,7 @@ func TestChannelNext(t *testing.T) {
 				epA := channel.NewEpisode(srcA, time.Minute)
 				epB := channel.NewEpisode(srcB, time.Minute)
 				// Only one series so shuffle always picks it; must advance to epB, not restart at epA.
-				srA := channel.NewSeries("ShowA", channel.Defer, channel.NewAnonymousSeason(epA, epB))
+				srA := channel.NewSeries("ShowA", channel.OnceMode, channel.NewAnonymousSeason(epA, epB))
 				ch := channel.NewEmptyChannel(channel.NewSchedule(srA))
 				ch.SetShuffle(true)
 				return ch
@@ -212,8 +212,8 @@ func TestChannelNext(t *testing.T) {
 			ch: func() *channel.Channel {
 				epA := channel.NewEpisode(srcA, time.Minute)
 				epB := channel.NewEpisode(srcB, time.Minute)
-				srA := channel.NewSeries("ShowA", channel.Defer, channel.NewAnonymousSeason(epA))
-				srB := channel.NewSeries("ShowB", channel.Defer, channel.NewAnonymousSeason(epB))
+				srA := channel.NewSeries("ShowA", channel.OnceMode, channel.NewAnonymousSeason(epA))
+				srB := channel.NewSeries("ShowB", channel.OnceMode, channel.NewAnonymousSeason(epB))
 				ch := channel.NewEmptyChannel(channel.NewSchedule(srA, srB))
 				ch.SetShuffle(true)
 				return ch
@@ -260,7 +260,7 @@ func TestChannelJump(t *testing.T) {
 		{
 			name: "sets state to target episode",
 			ch: func() *channel.Channel {
-				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(
+				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(
 					channel.NewEpisode(srcA, time.Minute),
 					channel.NewEpisode(srcB, time.Minute),
 				))))
@@ -276,7 +276,7 @@ func TestChannelJump(t *testing.T) {
 					channel.NewClip(0, 30*time.Second),
 					channel.NewClip(60*time.Second, 90*time.Second),
 				)
-				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(ep))))
+				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(ep))))
 			},
 			src:     srcA,
 			pos:     45 * time.Second,
@@ -285,7 +285,7 @@ func TestChannelJump(t *testing.T) {
 		{
 			name: "unknown source returns error",
 			ch: func() *channel.Channel {
-				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(
+				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(
 					channel.NewEpisode(srcA, time.Minute),
 				))))
 			},
@@ -296,7 +296,7 @@ func TestChannelJump(t *testing.T) {
 			// Single mode, 1 episode; position at end → CurrentSegmentAt returns false.
 			name: "position past end returns error",
 			ch: func() *channel.Channel {
-				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(
+				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(
 					channel.NewEpisode(srcA, time.Minute),
 				))))
 			},
@@ -331,7 +331,7 @@ func TestChannelProgress(t *testing.T) {
 		{
 			name: "records position for known source",
 			ch: func() *channel.Channel {
-				sr := channel.NewSeries("Show", channel.Single, channel.NewAnonymousSeason(
+				sr := channel.NewSeries("Show", channel.OnceMode, channel.NewAnonymousSeason(
 					channel.NewEpisode(srcA, time.Minute),
 					channel.NewEpisode(srcB, time.Minute),
 				))
@@ -345,7 +345,7 @@ func TestChannelProgress(t *testing.T) {
 		{
 			name: "unknown source is a no-op",
 			ch: func() *channel.Channel {
-				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(
+				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(
 					channel.NewEpisode(srcA, time.Minute),
 				))))
 			},
@@ -367,7 +367,7 @@ func TestChannelProgress(t *testing.T) {
 }
 
 func TestChannelToggleSeriesActive(t *testing.T) {
-	sr := channel.NewSeries("Show", channel.Single, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))
+	sr := channel.NewSeries("Show", channel.OnceMode, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))
 	ch := channel.NewEmptyChannel(channel.NewSchedule(sr))
 
 	assert.True(t, ch.State().IsActive(sr.ID))
@@ -378,11 +378,11 @@ func TestChannelToggleSeriesActive(t *testing.T) {
 }
 
 func TestChannelToggleSeriesActivePicksNewWhenCurrentlyActive(t *testing.T) {
-	srA := channel.NewSeries("ShowA", channel.Single, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))
-	srB := channel.NewSeries("ShowB", channel.Single, channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)))
+	srA := channel.NewSeries("ShowA", channel.OnceMode, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))
+	srB := channel.NewSeries("ShowB", channel.OnceMode, channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)))
 	ch := channel.NewEmptyChannel(channel.NewSchedule(srA, srB))
 
-	ch.Progress(srcA, 0)
+	require.NoError(t, ch.Jump(srcA, 0))
 	require.Equal(t, srA.ID, ch.State().ActiveSeries)
 
 	ch.ToggleSeriesActive(srA.ID)
@@ -402,7 +402,7 @@ func TestChannelSeriesStateOf(t *testing.T) {
 		{
 			name: "unknown source returns zero state",
 			ch: func() *channel.Channel {
-				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(
+				return channel.NewEmptyChannel(channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(
 					channel.NewEpisode(srcA, time.Minute),
 				))))
 			},
@@ -413,7 +413,7 @@ func TestChannelSeriesStateOf(t *testing.T) {
 		{
 			name: "tracks progress after Progress call",
 			ch: func() *channel.Channel {
-				sr := channel.NewSeries("Show", channel.Single, channel.NewAnonymousSeason(
+				sr := channel.NewSeries("Show", channel.OnceMode, channel.NewAnonymousSeason(
 					channel.NewEpisode(srcA, time.Minute),
 					channel.NewEpisode(srcB, time.Minute),
 				))
@@ -433,4 +433,33 @@ func TestChannelSeriesStateOf(t *testing.T) {
 			assert.Equal(t, tt.wantPos, gotPos)
 		})
 	}
+}
+
+func TestChannelProgressDoesNotOverrideActiveSeries(t *testing.T) {
+	srA := channel.NewSeries("ShowA", channel.OnceMode, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))
+	srB := channel.NewSeries("ShowB", channel.OnceMode, channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)))
+	ch := channel.NewEmptyChannel(channel.NewSchedule(srA, srB))
+
+	// Establish srB as the active series via an explicit Jump.
+	require.NoError(t, ch.Jump(srcB, 0))
+	require.Equal(t, srB.ID, ch.State().ActiveSeries)
+
+	// A stale Progress from srcA (e.g. in-flight at the time of the Jump) must
+	// not revert ActiveSeries back to srA.
+	ch.Progress(srcA, 30*time.Second)
+	assert.Equal(t, srB.ID, ch.State().ActiveSeries, "stale Progress must not override Jump")
+
+	// The position for srA is still recorded for resume purposes.
+	gotSrc, gotPos := ch.SeriesStateOf(srcA)
+	assert.Equal(t, srcA, gotSrc)
+	assert.Equal(t, 30*time.Second, gotPos)
+}
+
+func TestChannelOnceModeExhaustesSeries(t *testing.T) {
+	sr := channel.NewSeries("Show", channel.OnceMode, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))
+	ch := channel.NewEmptyChannel(channel.NewSchedule(sr))
+
+	err := ch.Next(srcA, time.Minute)
+	assert.Error(t, err, "OnceMode should exhaust series and return error when no more content")
+	assert.False(t, ch.State().IsActive(sr.ID), "exhausted series must be inactive")
 }

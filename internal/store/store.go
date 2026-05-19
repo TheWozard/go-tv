@@ -107,7 +107,7 @@ func LoadState(path string, schedule *channel.Schedule) *channel.State {
 	src, pos := state.Get()
 	if current, ok := schedule.CurrentSegmentAt(src, pos); ok {
 		if !current.Source.Equal(src) || current.Clip.Start > pos {
-			state.Jump(state.ActiveSeries, current.Source, current.Clip.Start)
+			state.Activate(state.ActiveSeries, current.Source, current.Clip.Start)
 		}
 		return state
 	}

@@ -20,26 +20,26 @@ func TestScheduleCurrentSegmentAt(t *testing.T) {
 	}{
 		{
 			"source not in schedule",
-			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))),
+			channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))),
 			srcB, 0,
 			channel.Segment{}, false,
 		},
 		{
 			"single season: position within episode",
-			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))),
+			channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))),
 			srcA, 30 * time.Second,
 			channel.Segment{Source: srcA, Clip: channel.NewClip(0, time.Minute)},
 			true,
 		},
 		{
 			"single season Single mode: past end returns false",
-			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))),
+			channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))),
 			srcA, time.Minute,
 			channel.Segment{}, false,
 		},
 		{
 			"two seasons: position past first season advances to second",
-			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single,
+			channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode,
 				channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)),
 				channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)),
 			)),
@@ -49,7 +49,7 @@ func TestScheduleCurrentSegmentAt(t *testing.T) {
 		},
 		{
 			"two seasons: position within first season stays in first",
-			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single,
+			channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode,
 				channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)),
 				channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)),
 			)),
@@ -59,7 +59,7 @@ func TestScheduleCurrentSegmentAt(t *testing.T) {
 		},
 		{
 			"Single mode: past last season returns false",
-			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single,
+			channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode,
 				channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)),
 				channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)),
 			)),
@@ -78,7 +78,7 @@ func TestScheduleCurrentSegmentAt(t *testing.T) {
 		},
 		{
 			"three seasons: advances to correct next season",
-			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single,
+			channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode,
 				channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)),
 				channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)),
 				channel.NewAnonymousSeason(channel.NewEpisode(srcC, time.Minute)),
@@ -89,7 +89,7 @@ func TestScheduleCurrentSegmentAt(t *testing.T) {
 		},
 		{
 			"episode with clips: position between clips skips to next",
-			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(
+			channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(
 				channel.NewEpisode(srcA, 90*time.Second,
 					channel.NewClip(0, 30*time.Second),
 					channel.NewClip(60*time.Second, 90*time.Second),
@@ -121,19 +121,19 @@ func TestScheduleNextEpisodeInSeries(t *testing.T) {
 	}{
 		{
 			"source not in schedule",
-			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))),
+			channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))),
 			srcB,
 			channel.Segment{}, false,
 		},
 		{
 			"single episode Single mode: no next episode returns false",
-			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))),
+			channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)))),
 			srcA,
 			channel.Segment{}, false,
 		},
 		{
 			"two episodes: returns second episode",
-			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single, channel.NewAnonymousSeason(
+			channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode, channel.NewAnonymousSeason(
 				channel.NewEpisode(srcA, time.Minute),
 				channel.NewEpisode(srcB, time.Minute),
 			))),
@@ -143,7 +143,7 @@ func TestScheduleNextEpisodeInSeries(t *testing.T) {
 		},
 		{
 			"two seasons: end of first season advances to second",
-			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single,
+			channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode,
 				channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)),
 				channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)),
 			)),
@@ -153,7 +153,7 @@ func TestScheduleNextEpisodeInSeries(t *testing.T) {
 		},
 		{
 			"Single mode: no more episodes in last season returns false",
-			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single,
+			channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode,
 				channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)),
 				channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)),
 			)),
@@ -184,7 +184,7 @@ func TestScheduleNextEpisodeInSeries(t *testing.T) {
 		},
 		{
 			"three seasons: middle season advances to correct next",
-			channel.NewSchedule(channel.NewAnonymousSeries(channel.Single,
+			channel.NewSchedule(channel.NewAnonymousSeries(channel.OnceMode,
 				channel.NewAnonymousSeason(channel.NewEpisode(srcA, time.Minute)),
 				channel.NewAnonymousSeason(channel.NewEpisode(srcB, time.Minute)),
 				channel.NewAnonymousSeason(channel.NewEpisode(srcC, time.Minute)),

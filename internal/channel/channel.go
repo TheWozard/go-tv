@@ -53,8 +53,8 @@ func (c *Channel) CurrentSegment() Segment {
 // Called periodically by the player to persist where the viewer is within the episode.
 func (c *Channel) Progress(source Source, position time.Duration) {
 	sr := c.schedule.SeriesOf(source)
-	if sr != nil && (c.state.ActiveSeries == "" || sr.ID == c.state.ActiveSeries) {
-		c.state.Update(sr, source, position)
+	if sr != nil {
+		c.state.SetPosition(sr.ID, source, position)
 	}
 }
 
@@ -70,7 +70,7 @@ func (c *Channel) Next(source Source, position time.Duration) error {
 	}
 	if clip, ok := ep.ClipAfter(position); ok {
 		sr := c.schedule.SeriesOf(source)
-		c.state.Update(sr, source, clip.Start)
+		c.state.Activate(sr.ID, source, clip.Start)
 		return nil
 	}
 	err := c.orderedNext(source)
@@ -105,7 +105,7 @@ func (c *Channel) orderedNext(source Source) error {
 	if sr == nil {
 		return errors.New("segment series not found")
 	}
-	c.state.Update(sr, seg.Source, seg.Clip.Start)
+	c.state.Activate(sr.ID, seg.Source, seg.Clip.Start)
 	return nil
 }
 
@@ -121,7 +121,7 @@ func (c *Channel) Jump(source Source, position time.Duration) error {
 	if !ok {
 		return errors.New("invalid position for source")
 	}
-	c.state.Jump(sr.ID, seg.Source, seg.Clip.Start)
+	c.state.Activate(sr.ID, seg.Source, seg.Clip.Start)
 	return nil
 }
 

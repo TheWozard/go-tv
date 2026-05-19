@@ -98,7 +98,7 @@ func (h *EditorHandler) seriesModeHandler(w http.ResponseWriter, r *http.Request
 	}
 	newMode := channel.LoopMode
 	if sr.Mode == channel.LoopMode {
-		newMode = channel.Defer
+		newMode = channel.OnceMode
 	}
 	if err := h.channel.SetSeriesMode(seriesID, newMode); err != nil {
 		h.logger.Error("set series mode", err)
@@ -127,7 +127,7 @@ func (h *EditorHandler) episodeModeHandler(w http.ResponseWriter, r *http.Reques
 	if ep.Mode == channel.EpisodeContinueMode {
 		newMode = channel.EpisodeInheritMode
 	}
-	updated, err := h.channel.SetEpisodeMode(source.ID, newMode)
+	updated, err := h.channel.SetEpisodeMode(source, newMode)
 	if err != nil {
 		h.logger.Error("set episode mode", err)
 		http.Error(w, "failed to save", http.StatusInternalServerError)
@@ -210,7 +210,7 @@ func (h *EditorHandler) sbPostHandler(w http.ResponseWriter, r *http.Request) {
 			End:   time.Duration(end * float64(time.Second)).Truncate(time.Second),
 		})
 	}
-	updated, err := h.channel.ApplyCuts(videoID, cuts)
+	updated, err := h.channel.ApplyCuts(channel.NewYoutubeSource(videoID), cuts)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

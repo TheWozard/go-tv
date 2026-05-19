@@ -67,8 +67,7 @@ func (s *State) EachInactiveSeries(fn func(id string)) {
 // Used by the store when bootstrapping from a saved state file.
 func NewStateFor(seriesID string, src Source, pos time.Duration) *State {
 	s := NewEmptyState()
-	s.ActiveSeries = seriesID
-	s.series[seriesID] = SeriesState{Source: src, Position: pos}
+	s.Activate(seriesID, src, pos)
 	return s
 }
 
@@ -93,17 +92,18 @@ func (s *State) SetSeriesState(id string, src Source, pos time.Duration) {
 	s.series[id] = SeriesState{Source: src, Position: pos}
 }
 
-// Jump sets the active series and updates its playback state.
-func (s *State) Jump(seriesID string, src Source, pos time.Duration) {
-	s.ActiveSeries = seriesID
+// SetPosition records the current playback position for a series without
+// changing which series is active. Use from Progress to avoid stale updates
+// overriding an in-flight Jump or Next.
+func (s *State) SetPosition(seriesID string, src Source, pos time.Duration) {
 	s.series[seriesID] = SeriesState{Source: src, Position: pos}
 }
 
-// Update records the current playback position for a series.
-func (s *State) Update(series *Series, src Source, pos time.Duration) {
-	id := series.ID
-	s.ActiveSeries = id
-	s.series[id] = SeriesState{Source: src, Position: pos}
+// Activate sets the active series and records its current playback position.
+// Use from Next and Jump when the playing series intentionally changes.
+func (s *State) Activate(seriesID string, src Source, pos time.Duration) {
+	s.ActiveSeries = seriesID
+	s.series[seriesID] = SeriesState{Source: src, Position: pos}
 }
 
 // EachSeriesState calls fn for every series with persisted state.
