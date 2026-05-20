@@ -56,7 +56,7 @@ templ sbSegRow(seg SBSegment) {
 	{{ colors, ok := sbCatColors[seg.Category]; if !ok { colors = [2]string{"#33333322", "#888"} } }}
 	<li
 		class="sb-seg-row"
-		onclick="this.querySelector('.sb-check').click()"
+		onclick="if(event.target.type!=='checkbox')this.querySelector('.sb-check').click()"
 	>
 		<input
 			type="checkbox"
