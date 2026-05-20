@@ -54,13 +54,18 @@ func NewAnonymousSeries(mode SeriesMode, seasons ...Season) *Series {
 func (sr *Series) FirstSegmentFrom(seasonIdx, episodeIdx int) (Segment, bool) {
 	start := min(seasonIdx, len(sr.Seasons))
 	for _, s := range sr.Seasons[start:] {
-		if seg, ok := s.FirstSegmentFrom(episodeIdx); ok {
-			return seg, true
+		if !s.Disabled {
+			if seg, ok := s.FirstSegmentFrom(episodeIdx); ok {
+				return seg, true
+			}
 		}
 		episodeIdx = 0
 	}
 	if sr.Mode == LoopMode {
 		for _, s := range sr.Seasons {
+			if s.Disabled {
+				continue
+			}
 			if seg, ok := s.FirstSegmentFrom(0); ok {
 				return seg, true
 			}

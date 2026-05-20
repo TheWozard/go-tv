@@ -1,16 +1,25 @@
 package components
 
 import (
+	"encoding/json"
+	"fmt"
 	"go-tv/internal/channel"
 	"time"
 )
 
-templ SetGroup(set channel.Season, seriesName string, active channel.Source, activeAt time.Duration, stateSource channel.Source, stateAt time.Duration, jellyfinBaseURL string) {
+func seasonVals(seriesID, seasonName string) string {
+	b, _ := json.Marshal(map[string]string{"series_id": seriesID, "season_name": seasonName})
+	return string(b)
+}
+
+templ SetGroup(set channel.Season, seriesName string, active channel.Source, activeAt time.Duration, stateSource channel.Source, stateAt time.Duration, jellyfinBaseURL string, num int) {
 	{{ isActiveSet := false; for _, ep := range set.Episodes { if ep.Source.Equal(active) { isActiveSet = true; break } } }}
-	<li class={ "set-item collapsed", templ.KV("active-set", isActiveSet) }>
+	<li class={ "set-item", templ.KV("active-set", isActiveSet), templ.KV("disabled-season", set.Disabled) }>
 		<div class="set-header">
 			<div class="handle text-faint" title="drag to reorder">⠿</div>
-			<button class="set-toggle" title="collapse/expand" onclick="this.closest('.set-item').classList.toggle('collapsed')">▶</button>
+			if num > 0 {
+				<span class="set-num text-faint">{ fmt.Sprintf("%d.", num) }</span>
+			}
 			<input
 				class="set-name-input"
 				type="text"
@@ -24,10 +33,23 @@ templ SetGroup(set channel.Season, seriesName string, active channel.Source, act
 			/>
 			<input type="hidden" name="old_name" value={ set.Name }/>
 			<input type="hidden" name="series_name" value={ seriesName }/>
+			<button
+				class={ "set-active-btn", templ.KV("is-inactive", set.Disabled) }
+				hx-post="/api/season/toggle"
+				hx-vals={ seasonVals(seriesName, set.Name) }
+				hx-target="closest .set-item"
+				hx-swap="outerHTML"
+			>
+				if set.Disabled {
+					○
+				} else {
+					◉
+				}
+			</button>
 		</div>
 		<ul class="set-videos" id={ "set-videos-" + set.Name }>
-			for _, ep := range set.Episodes {
-				@VideoCard(ep, ep.Source.Equal(active), activeAt, stateSource, stateAt, jellyfinBaseURL)
+			for i, ep := range set.Episodes {
+				@VideoCard(ep, ep.Source.Equal(active), activeAt, stateSource, stateAt, jellyfinBaseURL, i+1)
 			}
 		</ul>
 	</li>

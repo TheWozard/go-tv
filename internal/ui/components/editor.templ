@@ -11,56 +11,93 @@ func toggleVals(seriesID string) string {
 	return string(b)
 }
 
-templ VideoList(series []*channel.Series, state *channel.State, active channel.Source, activeAt time.Duration, jellyfinBaseURL string) {
-	if len(series) == 0 {
-		<ul id="series-list">
-			<li id="status" class="text-muted">No series loaded.</li>
-		</ul>
-	} else {
-		<ul id="series-list">
-			for _, ser := range series {
-				@SeriesSection(ser, state, active, activeAt, jellyfinBaseURL)
+func selectedSeries(series []*channel.Series, active channel.Source) *channel.Series {
+	for _, sr := range series {
+		for _, season := range sr.Seasons {
+			for _, ep := range season.Episodes {
+				if ep.Source.Equal(active) {
+					return sr
+				}
 			}
-		</ul>
+		}
 	}
+	if len(series) > 0 {
+		return series[0]
+	}
+	return nil
 }
 
-templ SeriesSection(ser *channel.Series, state *channel.State, active channel.Source, activeAt time.Duration, jellyfinBaseURL string) {
-	{{ isActiveSeries := false; for _, season := range ser.Seasons { for _, ep := range season.Episodes { if ep.Source.Equal(active) { isActiveSeries = true; break } } } }}
-	{{ stateSource, stateAt := state.GetSeriesState(ser.ID) }}
+templ SeriesNavItem(ser *channel.Series, state *channel.State, selected bool, active channel.Source) {
 	{{ seriesActive := state.IsActive(ser.ID) }}
-	<li class={ "series-item", templ.KV("active-series", isActiveSeries), templ.KV("inactive-series", !seriesActive) } id={ "series-" + ser.ID } data-series-name={ ser.ID }>
-		<div class="series-header">
+	<div
+		class={ "series-nav-item", templ.KV("selected", selected), templ.KV("inactive-series", !seriesActive) }
+		id={ "nav-" + ser.ID }
+		data-series-id={ ser.ID }
+	>
+		<button
+			class="series-nav-name"
+			hx-get={ "/api/editor/series/" + ser.ID }
+			hx-target="#series-detail-wrap"
+			hx-swap="innerHTML"
+		>{ ser.Name }</button>
+		<button
+			class={ "series-active-btn", templ.KV("is-inactive", !seriesActive) }
+			hx-post="/api/series/toggle"
+			hx-vals={ toggleVals(ser.ID) }
+			hx-target={ "#nav-" + ser.ID }
+			hx-swap="outerHTML"
+		>
+			if seriesActive {
+				◉
+			} else {
+				○
+			}
+		</button>
+	</div>
+}
+
+templ SeriesDetail(ser *channel.Series, state *channel.State, active channel.Source, activeAt time.Duration, jellyfinBaseURL string) {
+	{{ stateSource, stateAt := state.GetSeriesState(ser.ID) }}
+	<div id="series-detail" data-series-id={ ser.ID }>
+		<div class="detail-header">
 			<span class="series-title">{ ser.Name }</span>
-			<div class="series-header-actions">
-				<button
-					class={ "series-active-btn", templ.KV("is-inactive", !seriesActive) }
-					hx-post="/api/series/toggle"
-					hx-vals={ toggleVals(ser.ID) }
-					hx-target={ "#series-" + ser.ID }
-					hx-swap="outerHTML"
-				>
-					if seriesActive {
-						active
-					} else {
-						inactive
-					}
-				</button>
-				<button
-					class={ "series-mode-btn", templ.KV("is-active", ser.Mode == channel.LoopMode) }
-					hx-post="/api/series/mode"
-					hx-vals={ toggleVals(ser.ID) }
-					hx-target={ "#series-" + ser.ID }
-					hx-swap="outerHTML"
-				>loop</button>
-			</div>
+			<input class="filter-input" type="search" placeholder="filter episodes…" autocomplete="off"/>
+			<button
+				class={ "series-mode-btn", templ.KV("is-active", ser.Mode == channel.LoopMode) }
+				hx-post="/api/series/mode"
+				hx-vals={ toggleVals(ser.ID) }
+				hx-target="#series-detail"
+				hx-swap="outerHTML"
+			>loop</button>
 		</div>
 		<ul class="series-seasons" id={ "series-seasons-" + ser.ID }>
-			for _, season := range ser.Seasons {
-				@SetGroup(season, ser.ID, active, activeAt, stateSource, stateAt, jellyfinBaseURL)
+			for i, season := range ser.Seasons {
+				@SetGroup(season, ser.ID, active, activeAt, stateSource, stateAt, jellyfinBaseURL, i+1)
 			}
 		</ul>
-	</li>
+	</div>
+}
+
+templ VideoList(series []*channel.Series, state *channel.State, active channel.Source, activeAt time.Duration, jellyfinBaseURL string) {
+	{{ sel := selectedSeries(series, active) }}
+	if len(series) == 0 {
+		<div id="series-list">
+			<div id="status" class="text-muted">No series loaded.</div>
+		</div>
+	} else {
+		<div id="series-list">
+			<nav id="series-nav">
+				for _, ser := range series {
+					@SeriesNavItem(ser, state, sel != nil && sel.ID == ser.ID, active)
+				}
+			</nav>
+			<div id="series-detail-wrap">
+				if sel != nil {
+					@SeriesDetail(sel, state, active, activeAt, jellyfinBaseURL)
+				}
+			</div>
+		</div>
+	}
 }
 
 templ EditorHeader(state *channel.State) {

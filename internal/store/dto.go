@@ -31,6 +31,7 @@ type episodeDTO struct {
 type seasonDTO struct {
 	Name     string       `json:"name"`
 	Episodes []episodeDTO `json:"episodes"`
+	Disabled bool         `json:"disabled,omitempty"`
 }
 
 // seriesDTO is the JSON representation of a channel.Series.
@@ -83,7 +84,7 @@ func toSeriesDTO(s *channel.Series) seriesDTO {
 			}
 			eps[j] = eDTO
 		}
-		dto.Seasons[i] = seasonDTO{Name: season.Name, Episodes: eps}
+		dto.Seasons[i] = seasonDTO{Name: season.Name, Episodes: eps, Disabled: season.Disabled}
 	}
 	return dto
 }
@@ -116,7 +117,9 @@ func fromSeriesDTO(dto seriesDTO) *channel.Series {
 			}
 			eps[j] = ep
 		}
-		seasons[i] = channel.NewSeason(sDTO.Name, eps...)
+		s := channel.NewSeason(sDTO.Name, eps...)
+		s.Disabled = sDTO.Disabled
+		seasons[i] = s
 	}
 	return channel.NewSeriesWithID(id, dto.Name, mode, seasons...)
 }

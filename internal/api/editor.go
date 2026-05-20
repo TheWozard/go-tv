@@ -28,9 +28,11 @@ func (h *EditorHandler) Mount(r chi.Router) {
 	r.Post("/jump", h.jumpHandler)
 	r.Post("/series/rename", h.renameHandler)
 	r.Post("/series/toggle", h.seriesToggleHandler)
+	r.Post("/season/toggle", h.seasonToggleHandler)
 	r.Post("/series/mode", h.seriesModeHandler)
 	r.Post("/shuffle", h.shuffleToggleHandler)
 	r.Post("/episode/mode", h.episodeModeHandler)
+	r.Get("/editor/series/{seriesID}", h.seriesDetailHandler)
 	r.Get("/sponsorblock/{videoID}", h.sbGetHandler)
 	r.Post("/sponsorblock/{videoID}", h.sbPostHandler)
 }
@@ -52,6 +54,20 @@ func (h *EditorHandler) jumpHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h *EditorHandler) seriesDetailHandler(w http.ResponseWriter, r *http.Request) {
+	seriesID := chi.URLParam(r, "seriesID")
+	sr := h.findSeries(seriesID)
+	if sr == nil {
+		http.Error(w, "series not found", http.StatusNotFound)
+		return
+	}
+	seg := h.channel.CurrentSegment()
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := components.SeriesDetail(sr, h.channel.State(), seg.Source, seg.Clip.Start, h.jellyfin.URL).Render(r.Context(), w); err != nil {
+		h.logger.Error("render series detail", err)
+	}
+}
+
 func (h *EditorHandler) seriesToggleHandler(w http.ResponseWriter, r *http.Request) {
 	seriesID := r.FormValue("series_id")
 	if seriesID == "" {
@@ -61,22 +77,54 @@ func (h *EditorHandler) seriesToggleHandler(w http.ResponseWriter, r *http.Reque
 	if err := h.channel.ToggleSeriesActive(seriesID); err != nil {
 		h.logger.Error("toggle series active", err)
 	}
-	var sr *channel.Series
-	for _, s := range h.channel.AllSeries() {
-		if s.ID == seriesID {
-			sr = s
-			break
-		}
-	}
+	sr := h.findSeries(seriesID)
 	if sr == nil {
 		http.Error(w, "series not found", http.StatusNotFound)
 		return
 	}
 	seg := h.channel.CurrentSegment()
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.SeriesSection(sr, h.channel.State(), seg.Source, seg.Clip.Start, h.jellyfin.URL).Render(r.Context(), w); err != nil {
-		h.logger.Error("render series section", err)
+	selected := false
+	for _, season := range sr.Seasons {
+		for _, ep := range season.Episodes {
+			if ep.Source.Equal(seg.Source) {
+				selected = true
+			}
+		}
 	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := components.SeriesNavItem(sr, h.channel.State(), selected, seg.Source).Render(r.Context(), w); err != nil {
+		h.logger.Error("render series nav item", err)
+	}
+}
+
+func (h *EditorHandler) seasonToggleHandler(w http.ResponseWriter, r *http.Request) {
+	seriesID := r.FormValue("series_id")
+	seasonName := r.FormValue("season_name")
+	if seriesID == "" || seasonName == "" {
+		http.Error(w, "missing series_id or season_name", http.StatusBadRequest)
+		return
+	}
+	if err := h.channel.ToggleSeasonDisabled(seriesID, seasonName); err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	sr := h.findSeries(seriesID)
+	if sr == nil {
+		http.Error(w, "series not found", http.StatusNotFound)
+		return
+	}
+	seg := h.channel.CurrentSegment()
+	stateSource, stateAt := h.channel.State().GetSeriesState(seriesID)
+	for i, s := range sr.Seasons {
+		if s.Name == seasonName {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			if err := components.SetGroup(s, seriesID, seg.Source, seg.Clip.Start, stateSource, stateAt, h.jellyfin.URL, i+1).Render(r.Context(), w); err != nil {
+				h.logger.Error("render set group", err)
+			}
+			return
+		}
+	}
+	http.Error(w, "season not found", http.StatusNotFound)
 }
 
 func (h *EditorHandler) seriesModeHandler(w http.ResponseWriter, r *http.Request) {
@@ -85,13 +133,7 @@ func (h *EditorHandler) seriesModeHandler(w http.ResponseWriter, r *http.Request
 		http.Error(w, "missing series_id", http.StatusBadRequest)
 		return
 	}
-	var sr *channel.Series
-	for _, s := range h.channel.AllSeries() {
-		if s.ID == seriesID {
-			sr = s
-			break
-		}
-	}
+	sr := h.findSeries(seriesID)
 	if sr == nil {
 		http.Error(w, "series not found", http.StatusNotFound)
 		return
@@ -107,9 +149,34 @@ func (h *EditorHandler) seriesModeHandler(w http.ResponseWriter, r *http.Request
 	}
 	seg := h.channel.CurrentSegment()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.SeriesSection(sr, h.channel.State(), seg.Source, seg.Clip.Start, h.jellyfin.URL).Render(r.Context(), w); err != nil {
-		h.logger.Error("render series section", err)
+	if err := components.SeriesDetail(sr, h.channel.State(), seg.Source, seg.Clip.Start, h.jellyfin.URL).Render(r.Context(), w); err != nil {
+		h.logger.Error("render series detail", err)
 	}
+}
+
+func (h *EditorHandler) findSeries(id string) *channel.Series {
+	for _, s := range h.channel.AllSeries() {
+		if s.ID == id {
+			return s
+		}
+	}
+	return nil
+}
+
+// episodeNumOf returns the 1-based index of src within its season, or 0 if not found.
+func (h *EditorHandler) episodeNumOf(src channel.Source) int {
+	sr := h.channel.Schedule().SeriesOf(src)
+	if sr == nil {
+		return 0
+	}
+	for _, season := range sr.Seasons {
+		for i, ep := range season.Episodes {
+			if ep.Source.Equal(src) {
+				return i + 1
+			}
+		}
+	}
+	return 0
 }
 
 func (h *EditorHandler) episodeModeHandler(w http.ResponseWriter, r *http.Request) {
@@ -137,7 +204,7 @@ func (h *EditorHandler) episodeModeHandler(w http.ResponseWriter, r *http.Reques
 	isActive := seg.Source.Equal(updated.Source)
 	stateSource, stateAt := h.channel.SeriesStateOf(updated.Source)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.VideoCard(*updated, isActive, seg.Clip.Start, stateSource, stateAt, h.jellyfin.URL).Render(r.Context(), w); err != nil {
+	if err := components.VideoCard(*updated, isActive, seg.Clip.Start, stateSource, stateAt, h.jellyfin.URL, h.episodeNumOf(updated.Source)).Render(r.Context(), w); err != nil {
 		h.logger.Error("render video card", err)
 	}
 }
@@ -217,7 +284,7 @@ func (h *EditorHandler) sbPostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	stateSource, stateAt := h.channel.SeriesStateOf(updated.Source)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.VideoCard(*updated, false, 0, stateSource, stateAt, h.jellyfin.URL).Render(r.Context(), w); err != nil {
+	if err := components.VideoCard(*updated, false, 0, stateSource, stateAt, h.jellyfin.URL, h.episodeNumOf(updated.Source)).Render(r.Context(), w); err != nil {
 		h.logger.Error("render video card", err)
 	}
 }

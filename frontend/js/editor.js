@@ -5,17 +5,18 @@ function fmt(secs) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-// SortableJS drag-and-drop
+// SortableJS drag-and-drop scoped to the visible series detail panel.
 function initSortable() {
-  document.querySelectorAll('.series-seasons').forEach(ul => {
+  const detail = document.getElementById('series-detail');
+  if (!detail) return;
+  detail.querySelectorAll('.series-seasons').forEach(ul => {
     Sortable.create(ul, {
       handle: '.set-item > .set-header > .handle',
       animation: 150,
       onEnd: saveOrder,
     });
   });
-
-  document.querySelectorAll('.set-videos').forEach(ul => {
+  detail.querySelectorAll('.set-videos').forEach(ul => {
     Sortable.create(ul, {
       handle: '.card > .handle',
       animation: 150,
@@ -24,25 +25,61 @@ function initSortable() {
   });
 }
 
+function updateNavSelection() {
+  const detailId = document.getElementById('series-detail')?.dataset.seriesId;
+  document.querySelectorAll('.series-nav-item').forEach(el =>
+    el.classList.toggle('selected', el.dataset.seriesId === detailId));
+}
+
 document.addEventListener('DOMContentLoaded', initSortable);
 document.addEventListener('htmx:afterSwap', e => {
-  if (e.target.id === 'series-list') initSortable();
+  const targetId = e.detail.target?.id;
+  if (targetId === 'series-list' || targetId === 'series-detail-wrap' || targetId === 'series-detail') {
+    initSortable();
+  }
+  updateNavSelection();
 });
 
 function saveOrder() {
-  document.querySelectorAll('#series-list > .series-item').forEach(seriesEl => {
-    const seriesName = seriesEl.dataset.seriesName;
-    const seasons = [...seriesEl.querySelectorAll(':scope > .series-seasons > .set-item')].map(li => ({
-      name: li.querySelector('.set-name-input').value,
-      episode_ids: [...li.querySelectorAll('.card')].map(c => c.dataset.id),
-    }));
-    fetch('/api/series/reorder', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ series_name: seriesName, seasons }),
-    }).catch(() => {});
-  });
+  const detail = document.getElementById('series-detail');
+  if (!detail) return;
+  const seriesName = detail.dataset.seriesId;
+  const seasons = [...detail.querySelectorAll(':scope > .series-seasons > .set-item')].map(li => ({
+    name: li.querySelector('.set-name-input').value,
+    episode_ids: [...li.querySelectorAll('.card')].map(c => c.dataset.id),
+  }));
+  fetch('/api/series/reorder', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ series_name: seriesName, seasons }),
+  }).catch(() => {});
 }
+
+// Episode filter — delegated, no global needed.
+document.addEventListener('input', e => {
+  const input = e.target.closest('.filter-input');
+  if (!input) return;
+  const q = input.value.trim().toLowerCase();
+  const detail = document.getElementById('series-detail');
+  if (!detail) return;
+  detail.querySelectorAll('.set-item').forEach(season => {
+    if (!q) {
+      season.style.display = '';
+      season.querySelectorAll('.card').forEach(c => c.style.display = '');
+      return;
+    }
+    const seasonName = season.querySelector('.set-name-input')?.value.toLowerCase() ?? '';
+    const seasonMatches = seasonName.includes(q);
+    let anyEpisodeVisible = false;
+    season.querySelectorAll('.card').forEach(card => {
+      const title = card.querySelector('.title')?.textContent.toLowerCase() ?? '';
+      const show = seasonMatches || title.includes(q);
+      card.style.display = show ? '' : 'none';
+      if (show) anyEpisodeVisible = true;
+    });
+    season.style.display = anyEpisodeVisible ? '' : 'none';
+  });
+});
 
 // Position slider visual feedback — delegated, no global needed.
 document.addEventListener('input', e => {

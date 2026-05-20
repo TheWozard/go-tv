@@ -29,7 +29,24 @@ func RenameSeason(sc *channel.Schedule, seriesID, oldName, newName string) error
 	}
 	for i, s := range sr.Seasons {
 		if s.Name == oldName {
-			sr.Seasons[i] = channel.NewSeason(newName, s.Episodes...)
+			renamed := channel.NewSeason(newName, s.Episodes...)
+			renamed.Disabled = s.Disabled
+			sr.Seasons[i] = renamed
+			return nil
+		}
+	}
+	return errors.New("season not found")
+}
+
+// ToggleSeasonDisabled flips the Disabled flag of the named season within seriesID.
+func ToggleSeasonDisabled(sc *channel.Schedule, seriesID, seasonName string) error {
+	sr := findSeriesByID(sc, seriesID)
+	if sr == nil {
+		return errors.New("series not found")
+	}
+	for i, s := range sr.Seasons {
+		if s.Name == seasonName {
+			sr.Seasons[i].Disabled = !s.Disabled
 			return nil
 		}
 	}
@@ -44,7 +61,9 @@ func ReorderSeries(sc *channel.Schedule, seriesID string, orders []SeasonOrder) 
 	}
 
 	epByID := make(map[string]channel.Episode)
+	disabledByName := make(map[string]bool)
 	for _, s := range sr.Seasons {
+		disabledByName[s.Name] = s.Disabled
 		for _, ep := range s.Episodes {
 			epByID[ep.Source.ID] = ep
 		}
@@ -58,7 +77,9 @@ func ReorderSeries(sc *channel.Schedule, seriesID string, orders []SeasonOrder) 
 				eps = append(eps, ep)
 			}
 		}
-		newSeasons = append(newSeasons, channel.NewSeason(order.Name, eps...))
+		s := channel.NewSeason(order.Name, eps...)
+		s.Disabled = disabledByName[order.Name]
+		newSeasons = append(newSeasons, s)
 	}
 	sr.Seasons = newSeasons
 	sc.RebuildIndex()

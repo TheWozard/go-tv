@@ -9,14 +9,17 @@
 html,
 body {
   width: 100%;
+  height: 100%;
   background: #111;
-  overflow: auto;
+  overflow: hidden;
 }
 
 body {
   color: #ddd;
   font-family: system-ui, sans-serif;
   font-size: 14px;
+  display: flex;
+  flex-direction: column;
 }
 
 header {
@@ -78,16 +81,90 @@ header a:hover {
   color: #4a90d9;
 }
 
-.series-item {
-  list-style: none;
+#series-list {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
 }
 
-.series-header {
+#series-nav {
+  width: 200px;
+  flex-shrink: 0;
+  border-right: 1px solid #2a2a2a;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+#series-detail-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+}
+
+.series-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+}
+
+.series-nav-item.selected .series-nav-name {
+  color: #eee;
+}
+
+.series-nav-item.inactive-series .series-nav-name {
+  opacity: .4;
+}
+
+.series-nav-name {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: .85rem;
+  font-family: inherit;
+  text-align: left;
+  flex: 1;
+  padding: 4px 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color .15s;
+}
+
+.series-nav-name:hover {
+  color: #ccc;
+}
+
+.series-active-btn {
+  background: none;
+  border: none;
+  color: #4a8c50;
+  cursor: pointer;
+  font-size: .75rem;
+  line-height: 1;
+  padding: 2px 4px;
+  font-family: inherit;
+  flex-shrink: 0;
+  transition: opacity .15s;
+}
+
+.series-active-btn:hover {
+  opacity: .7;
+}
+
+.series-active-btn.is-inactive {
+  color: #7a5a2a;
+}
+
+.detail-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 0 10px;
+  padding: 0 0 12px;
   gap: 8px;
+  border-bottom: 1px solid #2a2a2a;
+  margin-bottom: 16px;
 }
 
 .series-title {
@@ -98,35 +175,26 @@ header a:hover {
   text-transform: uppercase;
 }
 
-.series-active-btn {
+.filter-input {
   background: none;
-  border: 1px solid #2a5c30;
-  color: #4a8c50;
-  cursor: pointer;
-  font-size: .6rem;
-  line-height: 1;
+  border: 1px solid #2a2a2a;
+  color: #aaa;
+  font-family: inherit;
+  font-size: .8rem;
   padding: 3px 8px;
   border-radius: 3px;
-  font-family: inherit;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  transition: opacity .15s;
-  align-self: center;
+  outline: none;
+  flex: 1;
+  min-width: 0;
+  transition: border-color .15s;
 }
 
-.series-active-btn:hover {
-  opacity: .7;
+.filter-input:focus {
+  border-color: #444;
 }
 
-.series-active-btn.is-inactive {
-  border-color: #4a3a1a;
-  color: #7a5a2a;
-}
-
-.series-header-actions {
-  display: flex;
-  gap: 4px;
-  align-items: center;
+.filter-input::placeholder {
+  color: #444;
 }
 
 .series-mode-btn {
@@ -151,20 +219,6 @@ header a:hover {
 .series-mode-btn.is-active {
   border-color: #2a4a7c;
   color: #4a90d9;
-}
-
-.series-item.inactive-series > .series-seasons {
-  opacity: .4;
-}
-
-#video-list {
-  list-style: none;
-  max-width: 860px;
-  margin: 24px auto;
-  padding: 0 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
 .card {
@@ -360,25 +414,9 @@ header a:hover {
   align-items: center;
   gap: 8px;
   padding: 6px 14px 6px 0;
-  border-bottom: 1px solid #222;
   margin-bottom: 8px;
 }
 
-.set-toggle {
-  background: none;
-  border: none;
-  color: #555;
-  cursor: pointer;
-  font-size: .65rem;
-  padding: 0 2px;
-  line-height: 1;
-  flex-shrink: 0;
-  transition: transform .15s;
-}
-
-.set-item:not(.collapsed) .set-toggle {
-  transform: rotate(90deg);
-}
 
 .set-name-input {
   background: none;
@@ -407,14 +445,6 @@ header a:hover {
   margin-bottom: 6px;
 }
 
-.set-item.collapsed .set-videos {
-  display: none;
-}
-
-.set-item.collapsed .set-header {
-  border-bottom: none;
-  margin-bottom: 0;
-}
 
 .set-item.active-set>.set-header {
   border-bottom-color: #22c55e44;
@@ -422,6 +452,35 @@ header a:hover {
 
 .set-item.active-set>.set-header .set-name-input {
   color: #22c55e;
+}
+
+.set-item.disabled-season > .set-videos {
+  opacity: .35;
+}
+
+.set-item.disabled-season > .set-header .set-name-input {
+  opacity: .4;
+}
+
+.set-active-btn {
+  background: none;
+  border: none;
+  color: #4a8c50;
+  cursor: pointer;
+  font-size: .75rem;
+  line-height: 1;
+  padding: 2px 4px;
+  font-family: inherit;
+  flex-shrink: 0;
+  transition: opacity .15s;
+}
+
+.set-active-btn:hover {
+  opacity: .7;
+}
+
+.set-active-btn.is-inactive {
+  color: #7a5a2a;
 }
 
 .segs-bar {

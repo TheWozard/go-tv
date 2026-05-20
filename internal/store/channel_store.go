@@ -66,6 +66,13 @@ func (cs *ChannelStore) ApplyCuts(source channel.Source, cuts []mutation.CutRang
 	return ep, nil
 }
 
+func (cs *ChannelStore) ToggleSeasonDisabled(seriesID, seasonName string) error {
+	if err := mutation.ToggleSeasonDisabled(cs.Channel.Schedule(), seriesID, seasonName); err != nil {
+		return err
+	}
+	return cs.saveSeries(seriesID)
+}
+
 func (cs *ChannelStore) ToggleSeriesActive(seriesID string) error {
 	cs.Channel.ToggleSeriesActive(seriesID)
 	return cs.saveState()
