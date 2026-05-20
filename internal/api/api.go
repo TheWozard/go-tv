@@ -47,8 +47,12 @@ func (s *Server) Route(r chi.Router) {
 
 func (s *Server) playerHandler(w http.ResponseWriter, r *http.Request) {
 	seg := s.channel.CurrentSegment()
+	_, pos := s.channel.State().Get()
+	if pos < seg.Clip.Start || pos >= seg.Clip.End {
+		pos = seg.Clip.Start
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.Player(seg.Source, seg.Clip.Start, seg.Clip.End, s.player, s.jellyfin).Render(r.Context(), w); err != nil {
+	if err := components.Player(seg.Source, pos, seg.Clip.End, s.player, s.jellyfin).Render(r.Context(), w); err != nil {
 		s.logger.Error("render player", err)
 	}
 }

@@ -27,12 +27,16 @@ func (h *PlayerHandler) Mount(r chi.Router) {
 
 func (h *PlayerHandler) stateHandler(w http.ResponseWriter, r *http.Request) {
 	seg := h.channel.CurrentSegment()
+	_, pos := h.channel.State().Get()
+	if pos < seg.Clip.Start || pos >= seg.Clip.End {
+		pos = seg.Clip.Start
+	}
 	streamURL := ""
 	if seg.Source.Kind == channel.SourceKindJellyfin {
 		streamURL = h.jellyfin.StreamURL(seg.Source.ID)
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.PlayerState(seg.Source, seg.Clip.Start, seg.Clip.End, streamURL).Render(r.Context(), w); err != nil {
+	if err := components.PlayerState(seg.Source, pos, seg.Clip.End, streamURL).Render(r.Context(), w); err != nil {
 		h.logger.Error("render player state", err)
 	}
 }
