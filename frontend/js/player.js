@@ -56,8 +56,12 @@ function applyState(sourceKind, sourceId, seconds, stopSeconds, streamURL) {
   state.currentSource = { kind: sourceKind, id: sourceId };
 
   if (sameSource) {
-    if (state.player && Math.abs(state.player.getCurrentTime() - seconds) > 5) {
-      state.player.seekTo(seconds);
+    if (state.player) {
+      const ended = state.player.getState() === 'ended';
+      if (ended || Math.abs(state.player.getCurrentTime() - seconds) > 5) {
+        state.player.seekTo(seconds);
+      }
+      if (ended) state.player.play();
     }
     return;
   }

@@ -42,6 +42,9 @@ function wrap(ytPlayer) {
     },
     loadVideo(videoId, startSeconds) {
       ytPlayer.loadVideoById({ videoId, startSeconds: Math.floor(startSeconds) });
+      // Explicit playVideo() is required on iOS Safari: loadVideoById alone does not
+      // autoplay in a cross-origin iframe when called outside a user gesture.
+      ytPlayer.playVideo();
     },
     destroy() { ytPlayer.destroy(); },
   };
