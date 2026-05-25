@@ -29,11 +29,21 @@ func selectedSeries(series []*channel.Series, active channel.Source) *channel.Se
 
 templ SeriesNavItem(ser *channel.Series, state *channel.State, selected bool, active channel.Source) {
 	{{ seriesActive := state.IsActive(ser.ID) }}
+	{{ isPlaying := state.ActiveSeries == ser.ID }}
 	<div
 		class={ "series-nav-item", templ.KV("selected", selected), templ.KV("inactive-series", !seriesActive) }
 		id={ "nav-" + ser.ID }
 		data-series-id={ ser.ID }
 	>
+		<button
+			class={ "series-play-btn", templ.KV("is-playing", isPlaying) }
+			hx-post="/api/series/activate"
+			hx-vals={ toggleVals(ser.ID) }
+			hx-target="#series-list"
+			hx-swap="outerHTML"
+		>
+			@IconPlay()
+		</button>
 		<button
 			class="series-nav-name"
 			hx-get={ "/api/editor/series/" + ser.ID }
@@ -47,11 +57,7 @@ templ SeriesNavItem(ser *channel.Series, state *channel.State, selected bool, ac
 			hx-target={ "#nav-" + ser.ID }
 			hx-swap="outerHTML"
 		>
-			if seriesActive {
-				◉
-			} else {
-				○
-			}
+			@IconCircle()
 		</button>
 	</div>
 }
@@ -68,7 +74,7 @@ templ SeriesDetail(ser *channel.Series, state *channel.State, active channel.Sou
 				hx-vals={ toggleVals(ser.ID) }
 				hx-target="#series-detail"
 				hx-swap="outerHTML"
-			>loop</button>
+			>@IconRepeat()</button>
 		</div>
 		<ul class="series-seasons" id={ "series-seasons-" + ser.ID }>
 			for i, season := range ser.Seasons {
@@ -109,13 +115,7 @@ templ EditorHeader(state *channel.State) {
 				hx-post="/api/shuffle"
 				hx-target="#editor-header"
 				hx-swap="outerHTML"
-			>
-				if state.Shuffle {
-					shuffle: on
-				} else {
-					shuffle: off
-				}
-			</button>
+			>@IconShuffle()</button>
 			<a href="/">Resume</a>
 		</nav>
 	</header>

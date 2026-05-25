@@ -59,8 +59,9 @@ func (s *Server) playerHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) editHandler(w http.ResponseWriter, r *http.Request) {
 	seg := s.channel.CurrentSegment()
+	_, activeAt := s.channel.State().Get()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.Editor(s.channel.AllSeries(), s.channel.State(), seg.Source, seg.Clip.Start, s.jellyfin.URL).Render(r.Context(), w); err != nil {
+	if err := components.Editor(s.channel.AllSeries(), s.channel.State(), seg.Source, activeAt, s.jellyfin.URL).Render(r.Context(), w); err != nil {
 		s.logger.Error("render editor", err)
 	}
 }

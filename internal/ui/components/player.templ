@@ -12,7 +12,7 @@ templ Player(source channel.Source, position, stopAt time.Duration, player confi
 		<body>
 			@PlayerState(source, position, stopAt, jellyfinStreamURL(source, jellyfin))
 			<div id="start-screen">
-				<button class="start-btn primary" onclick="startHere()">▶ Watch Here</button>
+				<button class="start-btn primary" onclick="startHere()">@IconPlay() Watch Here</button>
 				<a href="/edit">Edit</a>
 			</div>
 			<div
@@ -24,6 +24,7 @@ templ Player(source channel.Source, position, stopAt time.Duration, player confi
 			>
 				<div id="player"></div>
 				<div id="overlay">
+					<a id="edit-btn" href="/edit">Edit</a>
 					<div id="skip-left" class="skip-indicator"></div>
 					<div id="skip-right" class="skip-indicator"></div>
 <div id="progress-bar-wrap">

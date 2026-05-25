@@ -169,6 +169,31 @@ func (c *Channel) SetShuffle(shuffle bool) {
 	c.state.Shuffle = shuffle
 }
 
+// ActivateSeries makes the named series the currently playing series.
+// If the series was inactive it is also marked active. Falls back to the
+// series's first segment if no playback position has been recorded yet.
+func (c *Channel) ActivateSeries(seriesID string) error {
+	var sr *Series
+	for _, s := range c.schedule.Series {
+		if s.ID == seriesID {
+			sr = s
+			break
+		}
+	}
+	if sr == nil {
+		return errors.New("series not found")
+	}
+	c.state.SetActive(seriesID)
+	src, pos := c.state.GetSeriesState(seriesID)
+	if src.IsZero() {
+		if seg, ok := sr.FirstSegmentFrom(0, 0); ok {
+			src, pos = seg.Source, seg.Clip.Start
+		}
+	}
+	c.state.Activate(seriesID, src, pos)
+	return nil
+}
+
 // ToggleSeriesActive flips the active/inactive status of the named series.
 // Inactive series are skipped by Next and excluded from shuffle selection.
 // If the series being deactivated is the currently active series, a new active

@@ -29,7 +29,7 @@ templ SponsorBlockPanel(videoID string, segs []SBSegment) {
 	<div id={ "sb-panel-" + videoID } class="sb-panel">
 		<div class="sb-panel-header">
 			<span class="sb-panel-title">SponsorBlock</span>
-			<button class="sb-close">✕</button>
+			<button class="sb-close">@IconX()</button>
 		</div>
 		if len(segs) == 0 {
 			<p class="text-muted">No segments found.</p>

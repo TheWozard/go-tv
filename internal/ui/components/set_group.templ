@@ -16,7 +16,7 @@ templ SetGroup(set channel.Season, seriesName string, active channel.Source, act
 	{{ isActiveSet := false; for _, ep := range set.Episodes { if ep.Source.Equal(active) { isActiveSet = true; break } } }}
 	<li class={ "set-item", templ.KV("active-set", isActiveSet), templ.KV("disabled-season", set.Disabled) }>
 		<div class="set-header">
-			<div class="handle text-faint" title="drag to reorder">⠿</div>
+			<div class="handle text-faint" title="drag to reorder">@IconGripVertical()</div>
 			if num > 0 {
 				<span class="set-num text-faint">{ fmt.Sprintf("%d.", num) }</span>
 			}
@@ -40,11 +40,7 @@ templ SetGroup(set channel.Season, seriesName string, active channel.Source, act
 				hx-target="closest .set-item"
 				hx-swap="outerHTML"
 			>
-				if set.Disabled {
-					○
-				} else {
-					◉
-				}
+				@IconCircle()
 			</button>
 		</div>
 		<ul class="set-videos" id={ "set-videos-" + set.Name }>

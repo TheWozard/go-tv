@@ -26,6 +26,7 @@ type EditorHandler struct {
 
 func (h *EditorHandler) Mount(r chi.Router) {
 	r.Post("/jump", h.jumpHandler)
+	r.Post("/series/activate", h.seriesActivateHandler)
 	r.Post("/series/rename", h.renameHandler)
 	r.Post("/series/toggle", h.seriesToggleHandler)
 	r.Post("/season/toggle", h.seasonToggleHandler)
@@ -48,8 +49,9 @@ func (h *EditorHandler) jumpHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	seg := h.channel.CurrentSegment()
+	_, activeAt := h.channel.State().Get()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.VideoList(h.channel.AllSeries(), h.channel.State(), seg.Source, seg.Clip.Start, h.jellyfin.URL).Render(r.Context(), w); err != nil {
+	if err := components.VideoList(h.channel.AllSeries(), h.channel.State(), seg.Source, activeAt, h.jellyfin.URL).Render(r.Context(), w); err != nil {
 		h.logger.Error("render video list", err)
 	}
 }
@@ -62,9 +64,28 @@ func (h *EditorHandler) seriesDetailHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	seg := h.channel.CurrentSegment()
+	_, activeAt := h.channel.State().Get()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.SeriesDetail(sr, h.channel.State(), seg.Source, seg.Clip.Start, h.jellyfin.URL).Render(r.Context(), w); err != nil {
+	if err := components.SeriesDetail(sr, h.channel.State(), seg.Source, activeAt, h.jellyfin.URL).Render(r.Context(), w); err != nil {
 		h.logger.Error("render series detail", err)
+	}
+}
+
+func (h *EditorHandler) seriesActivateHandler(w http.ResponseWriter, r *http.Request) {
+	seriesID := r.FormValue("series_id")
+	if seriesID == "" {
+		http.Error(w, "missing series_id", http.StatusBadRequest)
+		return
+	}
+	if err := h.channel.ActivateSeries(seriesID); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	seg := h.channel.CurrentSegment()
+	_, activeAt := h.channel.State().Get()
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := components.VideoList(h.channel.AllSeries(), h.channel.State(), seg.Source, activeAt, h.jellyfin.URL).Render(r.Context(), w); err != nil {
+		h.logger.Error("render video list", err)
 	}
 }
 
@@ -114,11 +135,12 @@ func (h *EditorHandler) seasonToggleHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	seg := h.channel.CurrentSegment()
+	_, activeAt := h.channel.State().Get()
 	stateSource, stateAt := h.channel.State().GetSeriesState(seriesID)
 	for i, s := range sr.Seasons {
 		if s.Name == seasonName {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			if err := components.SetGroup(s, seriesID, seg.Source, seg.Clip.Start, stateSource, stateAt, h.jellyfin.URL, i+1).Render(r.Context(), w); err != nil {
+			if err := components.SetGroup(s, seriesID, seg.Source, activeAt, stateSource, stateAt, h.jellyfin.URL, i+1).Render(r.Context(), w); err != nil {
 				h.logger.Error("render set group", err)
 			}
 			return
@@ -148,8 +170,9 @@ func (h *EditorHandler) seriesModeHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 	seg := h.channel.CurrentSegment()
+	_, activeAt := h.channel.State().Get()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.SeriesDetail(sr, h.channel.State(), seg.Source, seg.Clip.Start, h.jellyfin.URL).Render(r.Context(), w); err != nil {
+	if err := components.SeriesDetail(sr, h.channel.State(), seg.Source, activeAt, h.jellyfin.URL).Render(r.Context(), w); err != nil {
 		h.logger.Error("render series detail", err)
 	}
 }
@@ -201,10 +224,11 @@ func (h *EditorHandler) episodeModeHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	seg := h.channel.CurrentSegment()
+	_, activeAt := h.channel.State().Get()
 	isActive := seg.Source.Equal(updated.Source)
 	stateSource, stateAt := h.channel.SeriesStateOf(updated.Source)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := components.VideoCard(*updated, isActive, seg.Clip.Start, stateSource, stateAt, h.jellyfin.URL, h.episodeNumOf(updated.Source)).Render(r.Context(), w); err != nil {
+	if err := components.VideoCard(*updated, isActive, activeAt, stateSource, stateAt, h.jellyfin.URL, h.episodeNumOf(updated.Source)).Render(r.Context(), w); err != nil {
 		h.logger.Error("render video card", err)
 	}
 }

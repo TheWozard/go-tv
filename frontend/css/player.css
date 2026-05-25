@@ -14,6 +14,12 @@ body {
   overflow: hidden;
 }
 
+.icon {
+  vertical-align: -0.125em;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
 #start-screen {
   position: fixed;
   inset: 0;
@@ -144,6 +150,28 @@ body {
 
 #progress-bar-stop.active {
   display: block;
+}
+
+#edit-btn {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  color: rgba(255, 255, 255, 0.6);
+  text-decoration: none;
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+  cursor: pointer;
+  padding: 6px 10px;
+}
+
+#edit-btn.visible {
+  opacity: 1;
+}
+
+#edit-btn:hover {
+  color: #fff;
 }
 
 #start-screen a {

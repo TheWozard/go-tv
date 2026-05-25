@@ -73,6 +73,13 @@ func (cs *ChannelStore) ToggleSeasonDisabled(seriesID, seasonName string) error 
 	return cs.saveSeries(seriesID)
 }
 
+func (cs *ChannelStore) ActivateSeries(seriesID string) error {
+	if err := cs.Channel.ActivateSeries(seriesID); err != nil {
+		return err
+	}
+	return cs.saveState()
+}
+
 func (cs *ChannelStore) ToggleSeriesActive(seriesID string) error {
 	cs.Channel.ToggleSeriesActive(seriesID)
 	return cs.saveState()

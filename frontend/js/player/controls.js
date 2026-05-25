@@ -5,6 +5,7 @@ import { debounce } from 'lodash-es';
 // advance() is called when playback should move to the next video.
 export function initControls(state, advance, reportProgress) {
   const overlay = document.getElementById('overlay');
+  const editBtn = document.getElementById('edit-btn');
   const progressWrap = document.getElementById('progress-bar-wrap');
   const progressFill = document.getElementById('progress-bar-fill');
   const progressStop = document.getElementById('progress-bar-stop');
@@ -16,11 +17,13 @@ export function initControls(state, advance, reportProgress) {
   function showControls() {
     overlay.style.cursor = 'default';
     progressWrap?.classList.add('visible');
+    editBtn?.classList.add('visible');
   }
 
   const hideControls = debounce(() => {
     overlay.style.cursor = 'none';
     progressWrap?.classList.remove('visible');
+    editBtn?.classList.remove('visible');
   }, HIDE_DELAY_MS);
 
   overlay.addEventListener('mousemove', () => {
@@ -138,7 +141,7 @@ export function initControls(state, advance, reportProgress) {
   let touchTapTimer = null;
 
   overlay.addEventListener('touchend', e => {
-    if (e.target.closest('#progress-bar-wrap') || e.target.closest('#fullscreen-btn')) return;
+    if (e.target.closest('#progress-bar-wrap') || e.target.closest('#fullscreen-btn') || e.target.closest('#edit-btn')) return;
     touchHandled = true;
 
     const now   = Date.now();
@@ -161,6 +164,7 @@ export function initControls(state, advance, reportProgress) {
   // Mouse clicks — skip the event if touch already handled it.
   overlay.addEventListener('click', e => {
     if (touchHandled) { touchHandled = false; return; }
+    if (e.target.closest('#edit-btn')) return;
     togglePlayPause();
   });
 

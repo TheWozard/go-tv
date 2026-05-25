@@ -27,7 +27,7 @@ templ VideoCard(v channel.Episode, isActive bool, activeAt time.Duration, stateS
 		class={ "card", templ.KV("active", isActive) }
 		data-id={ src.ID }
 	>
-		<div class="handle" title="drag to reorder">⠿</div>
+		<div class="handle" title="drag to reorder">@IconGripVertical()</div>
 		<div class="body">
 			<div class="meta">
 				<span class="title">
@@ -47,14 +47,14 @@ templ VideoCard(v channel.Episode, isActive bool, activeAt time.Duration, stateS
 							href={ templ.URL("https://www.youtube.com/watch?v=" + src.ID) }
 							target="_blank"
 							rel="noopener"
-						>↗ { src.ID }</a>
+						>@IconArrowUpRight() { src.ID }</a>
 					} else if src.Kind == channel.SourceKindJellyfin {
 						<a
 							class="vid-id jf-link text-muted"
 							href={ templ.URL(jellyfinBaseURL + "/web/index.html#!/details?id=" + src.ID) }
 							target="_blank"
 							rel="noopener"
-						>↗ { src.ID }</a>
+						>@IconArrowUpRight() { src.ID }</a>
 					} else {
 						<span class="vid-id text-muted">{ src.ID }</span>
 					}
@@ -73,7 +73,7 @@ templ VideoCard(v channel.Episode, isActive bool, activeAt time.Duration, stateS
 						hx-target="#series-list"
 						hx-swap="outerHTML"
 						hx-vals={ jumpVals(src.Kind, src.ID, "0") }
-					>▶</button>
+					>@IconPlay()</button>
 				</span>
 			</div>
 			<div class="segs-bar">
