@@ -30,6 +30,20 @@ func (cs *ChannelStore) Next(source channel.Source, position time.Duration) erro
 	return cs.saveState()
 }
 
+func (cs *ChannelStore) NextEpisode(source channel.Source) error {
+	if err := cs.Channel.NextEpisode(source); err != nil {
+		return err
+	}
+	return cs.saveState()
+}
+
+func (cs *ChannelStore) PrevEpisode(source channel.Source) error {
+	if err := cs.Channel.PrevEpisode(source); err != nil {
+		return err
+	}
+	return cs.saveState()
+}
+
 func (cs *ChannelStore) Jump(source channel.Source, position time.Duration) error {
 	if err := cs.Channel.Jump(source, position); err != nil {
 		return err

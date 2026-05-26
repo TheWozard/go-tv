@@ -3,7 +3,7 @@ import { debounce } from 'lodash-es';
 // initControls wires up the overlay and keyboard shortcuts.
 // state is a shared object { player, currentStop } mutated by player.js.
 // advance() is called when playback should move to the next video.
-export function initControls(state, advance, reportProgress) {
+export function initControls(state, advance, reportProgress, goToPrev, goToNext) {
   const overlay = document.getElementById('overlay');
   const editBtn = document.getElementById('edit-btn');
   const progressWrap = document.getElementById('progress-bar-wrap');
@@ -71,6 +71,7 @@ export function initControls(state, advance, reportProgress) {
   function tickProgress() {
     if (state.player) {
       const cur = state.player.getCurrentTime();
+      if (cur > 0) state.lastTime = cur;
       const dur = state.player.getDuration();
       if (dur > 0) {
         if (progressFill) {
@@ -102,11 +103,15 @@ export function initControls(state, advance, reportProgress) {
     }
   }, 500);
 
-  const skipLeft  = document.getElementById('skip-left');
-  const skipRight = document.getElementById('skip-right');
-  const skipSecs  = Math.round(skipMs / 1000);
-  if (skipLeft)  skipLeft.textContent  = `« ${skipSecs}s`;
-  if (skipRight) skipRight.textContent = `${skipSecs}s »`;
+  const skipLeft    = document.getElementById('skip-left');
+  const skipRight   = document.getElementById('skip-right');
+  const seekBackBtn = document.getElementById('seek-back-btn');
+  const seekFwdBtn  = document.getElementById('seek-fwd-btn');
+  const skipSecs    = Math.round(skipMs / 1000);
+  if (skipLeft)    skipLeft.textContent    = `« ${skipSecs}s`;
+  if (skipRight)   skipRight.textContent   = `${skipSecs}s »`;
+  if (seekBackBtn) seekBackBtn.textContent = `« ${skipSecs}s`;
+  if (seekFwdBtn)  seekFwdBtn.textContent  = `${skipSecs}s »`;
 
   function flashSkip(dir) {
     const el = dir > 0 ? skipRight : skipLeft;
@@ -134,6 +139,14 @@ export function initControls(state, advance, reportProgress) {
     }
   }
 
+  const prevEpBtn = document.getElementById('prev-ep-btn');
+  const nextEpBtn = document.getElementById('next-ep-btn');
+
+  seekBackBtn?.addEventListener('click', e => { e.stopPropagation(); doSkip(-1); });
+  seekFwdBtn?.addEventListener('click',  e => { e.stopPropagation(); doSkip(1); });
+  prevEpBtn?.addEventListener('click',   e => { e.stopPropagation(); goToPrev?.(); });
+  nextEpBtn?.addEventListener('click',   e => { e.stopPropagation(); goToNext?.(); });
+
   // Double-tap left/right halves of the overlay to skip; single tap to play/pause.
   // touchHandled blocks the synthetic click that browsers fire after touchend.
   let touchHandled = false;
@@ -141,7 +154,7 @@ export function initControls(state, advance, reportProgress) {
   let touchTapTimer = null;
 
   overlay.addEventListener('touchend', e => {
-    if (e.target.closest('#progress-bar-wrap') || e.target.closest('#fullscreen-btn') || e.target.closest('#edit-btn')) return;
+    if (e.target.closest('#progress-bar-wrap') || e.target.closest('#fullscreen-btn') || e.target.closest('#edit-btn') || e.target.closest('.seek-btn') || e.target.closest('.ep-btn')) return;
     touchHandled = true;
 
     const now   = Date.now();
@@ -186,4 +199,10 @@ export function initControls(state, advance, reportProgress) {
       if (dir > 0 && state.currentStop > 0 && newTime >= state.currentStop) advance();
     }
   });
+
+  return {
+    updatePauseState(s) {
+      overlay.classList.toggle('paused', s === 'paused');
+    },
+  };
 }

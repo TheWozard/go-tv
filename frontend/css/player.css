@@ -41,6 +41,9 @@ body {
   cursor: pointer;
   transition: border-color .2s, color .2s;
   min-width: 160px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .start-btn:hover {
@@ -172,6 +175,81 @@ body {
 
 #edit-btn:hover {
   color: #fff;
+}
+
+.seek-btn {
+  position: absolute;
+  top: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  border-radius: 50%;
+  width: 72px;
+  height: 72px;
+  color: #fff;
+  font-family: system-ui, sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, background 0.15s;
+}
+
+.seek-btn:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+#seek-back-btn {
+  left: 25%;
+  transform: translate(-50%, -50%);
+}
+
+#seek-fwd-btn {
+  right: 25%;
+  transform: translate(50%, -50%);
+}
+
+#overlay.paused .seek-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ep-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.45);
+  border: none;
+  border-radius: 50%;
+  width: 56px;
+  height: 56px;
+  color: #fff;
+  font-size: 1.4rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, background 0.15s;
+}
+
+.ep-btn:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+#prev-ep-btn { left: 10px; }
+#next-ep-btn { right: 10px; }
+
+#overlay.paused .ep-btn {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 #start-screen a {

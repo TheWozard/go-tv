@@ -58,6 +58,17 @@ func (sc *Schedule) NextEpisodeInSeries(source Source) (Segment, bool) {
 	return sc.Series[idx.series].FirstSegmentFrom(idx.season, idx.episode+1)
 }
 
+// PrevEpisodeInSeries returns the first segment of the episode immediately before
+// source's episode within the same series. Returns false if source is not in the
+// schedule or no earlier episode exists.
+func (sc *Schedule) PrevEpisodeInSeries(source Source) (Segment, bool) {
+	idx, ok := sc.index[source]
+	if !ok {
+		return Segment{}, false
+	}
+	return sc.Series[idx.series].LastSegmentBefore(idx.season, idx.episode)
+}
+
 // ActiveSeries returns all series for which isActive returns true.
 func (sc *Schedule) ActiveSeries(isActive func(string) bool) []*Series {
 	active := make([]*Series, 0, len(sc.Series))

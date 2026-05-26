@@ -3,6 +3,7 @@ package channel
 import (
 	"errors"
 	"math/rand/v2"
+	"sync"
 	"time"
 )
 
@@ -10,11 +11,13 @@ var errNoNextSegment = errors.New("no next segment")
 
 // Channel is the runtime orchestrator that pairs a Schedule with a playback State.
 // It exposes the four core player operations — CurrentSegment, Progress, Next, Jump —
-// and is the only entry point for mutating state.
+// and is the only entry point for mutating state. All public methods are safe for
+// concurrent use.
 //
 // Channel contains only domain logic. Persistence (loading from disk, auto-save)
 // is handled by store.ChannelStore.
 type Channel struct {
+	mu       sync.RWMutex
 	schedule *Schedule
 	state    *State
 }
@@ -37,6 +40,8 @@ func NewEmptyChannel(schedule *Schedule) *Channel {
 // first active series. If the saved position is no longer valid, it falls back
 // to the same default.
 func (c *Channel) CurrentSegment() Segment {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	src, pos := c.state.Get()
 	if src.IsZero() {
 		seg, _ := c.schedule.First(c.state.IsActive)
@@ -52,6 +57,8 @@ func (c *Channel) CurrentSegment() Segment {
 // Progress records the current playback position without advancing.
 // Called periodically by the player to persist where the viewer is within the episode.
 func (c *Channel) Progress(source Source, position time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	sr := c.schedule.SeriesOf(source)
 	if sr != nil {
 		c.state.SetPosition(sr.ID, source, position)
@@ -64,6 +71,8 @@ func (c *Channel) Progress(source Source, position time.Duration) {
 // the series advances sequentially, exhausting the current series when done.
 // Returns an error when source is unknown or no further segments exist.
 func (c *Channel) Next(source Source, position time.Duration) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	ep := c.schedule.FindEpisode(source)
 	if ep == nil {
 		return errors.New("unknown source")
@@ -112,10 +121,41 @@ func (c *Channel) orderedNext(id string, source Source) error {
 	return nil
 }
 
+// NextEpisode advances to the next episode in the current series without shuffle.
+// Returns an error if source is unknown or no further episode exists.
+func (c *Channel) NextEpisode(source Source) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	series := c.schedule.SeriesOf(source)
+	if series == nil {
+		return errors.New("unknown source")
+	}
+	return c.orderedNext(series.ID, source)
+}
+
+// PrevEpisode moves to the previous episode within the current series.
+// Returns an error if source is unknown or no earlier episode exists.
+func (c *Channel) PrevEpisode(source Source) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	series := c.schedule.SeriesOf(source)
+	if series == nil {
+		return errors.New("unknown source")
+	}
+	seg, ok := c.schedule.PrevEpisodeInSeries(source)
+	if !ok {
+		return errors.New("no previous episode")
+	}
+	c.state.activateIfCurrent(series.ID, seg.Source, seg.Clip.Start)
+	return nil
+}
+
 // Jump sets playback to an arbitrary source and position, snapping to the
 // nearest clip boundary. Returns an error if source is not in the schedule
 // or position falls outside all clips.
 func (c *Channel) Jump(source Source, position time.Duration) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	sr := c.schedule.SeriesOf(source)
 	if sr == nil {
 		return errors.New("source not found in schedule")
@@ -124,7 +164,7 @@ func (c *Channel) Jump(source Source, position time.Duration) error {
 	if !ok {
 		return errors.New("invalid position for source")
 	}
-	c.state.Activate(sr.ID, seg.Source, seg.Clip.Start)
+	c.state.Activate(sr.ID, seg.Source, position)
 	return nil
 }
 
@@ -157,6 +197,8 @@ func (c *Channel) Schedule() *Schedule {
 // SeriesStateOf returns the last-known source and position for the series that contains source.
 // Returns zero values if source is not in the schedule or no state has been recorded.
 func (c *Channel) SeriesStateOf(source Source) (Source, time.Duration) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	sr := c.schedule.SeriesOf(source)
 	if sr == nil {
 		return Source{}, 0
@@ -166,6 +208,8 @@ func (c *Channel) SeriesStateOf(source Source) (Source, time.Duration) {
 
 // SetShuffle enables or disables inter-series shuffle mode.
 func (c *Channel) SetShuffle(shuffle bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.state.Shuffle = shuffle
 }
 
@@ -173,6 +217,8 @@ func (c *Channel) SetShuffle(shuffle bool) {
 // If the series was inactive it is also marked active. Falls back to the
 // series's first segment if no playback position has been recorded yet.
 func (c *Channel) ActivateSeries(seriesID string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	var sr *Series
 	for _, s := range c.schedule.Series {
 		if s.ID == seriesID {
@@ -199,6 +245,8 @@ func (c *Channel) ActivateSeries(seriesID string) error {
 // If the series being deactivated is the currently active series, a new active
 // series is picked from the remaining active series.
 func (c *Channel) ToggleSeriesActive(seriesID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.state.IsActive(seriesID) {
 		c.state.SetInactive(seriesID)
 		if c.state.ActiveSeries == seriesID {

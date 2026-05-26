@@ -20,6 +20,26 @@ export function postNext(source, seconds) {
   });
 }
 
+// postNextEp asks the server to advance to the next episode (no shuffle, no clip logic)
+// and swaps in the new #player-state fragment via htmx.
+export function postNextEp(source) {
+  return htmx.ajax('POST', '/api/next-ep', {
+    target: '#player-state',
+    swap: 'outerHTML',
+    values: { source_kind: source.kind, source_id: source.id },
+  });
+}
+
+// postPrevEp asks the server to go back to the previous episode and swaps in the
+// new #player-state fragment via htmx.
+export function postPrevEp(source) {
+  return htmx.ajax('POST', '/api/prev-ep', {
+    target: '#player-state',
+    swap: 'outerHTML',
+    values: { source_kind: source.kind, source_id: source.id },
+  });
+}
+
 // getState fetches the current server state and swaps in a new #player-state
 // fragment. Used to resync the UI after the player has been paused or hidden.
 export function getState() {

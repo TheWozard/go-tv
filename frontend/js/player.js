@@ -1,5 +1,5 @@
 import { throttle } from 'lodash-es';
-import { postProgress, postNext, getState } from './player/api.js';
+import { postProgress, postNext, postNextEp, postPrevEp, getState } from './player/api.js';
 import { initControls } from './player/controls.js';
 import { createYoutubeBackend } from './player/backends/youtube.js';
 import { createJellyfinBackend } from './player/backends/jellyfin.js';
@@ -9,6 +9,7 @@ const state = {
   player: null,        // backend instance ({ play, pause, seekTo, getCurrentTime, getState })
   currentSource: null, // { kind, id } of the loaded video
   currentStop: 0,      // server-imposed stop time in seconds (0 = no stop)
+  lastTime: 0,         // last non-zero currentTime seen in rAF loop; fallback for platforms that reset to 0 on ENDED
 };
 
 // ytReady resolves when the YouTube IFrame API fires onYouTubeIframeAPIReady.
@@ -32,7 +33,11 @@ const resyncThresholdMs  = parseInt(document.getElementById('player-wrapper')?.d
 // Call advance.cancel() from controls to reset the window after user interaction.
 // State is applied via the htmx:afterSwap listener; errors are handled by htmx:responseError.
 const advance = throttle(() => {
-  postNext(state.currentSource, state.player?.getCurrentTime() ?? 0);
+  // Some platforms (iPad Chrome, Vivaldi) reset getCurrentTime() to 0 when ENDED fires.
+  // Fall back to the last non-zero time seen in the rAF loop so postNext sends a valid position.
+  const rawTime = state.player?.getCurrentTime();
+  const t = rawTime || state.lastTime || 0;
+  postNext(state.currentSource, t);
 }, advanceRetryMs, { leading: true, trailing: false });
 
 // reportProgress throttles progress updates to progressRateMs while playing.
@@ -59,6 +64,8 @@ function applyState(sourceKind, sourceId, seconds, stopSeconds, streamURL) {
     if (state.player) {
       const ended = state.player.getState() === 'ended';
       if (ended || Math.abs(state.player.getCurrentTime() - seconds) > 5) {
+        // Cancel the throttle so the ENDED that fires after seeking can trigger advance().
+        advance.cancel();
         state.player.seekTo(seconds);
       }
       if (ended) state.player.play();
@@ -134,6 +141,7 @@ function applyCurrentState() {
 // #player-state fragment. applyCurrentState() fires via htmx:afterSwap and
 // seeks / switches source as needed.
 
+let controls    = null;  // return value of initControls
 let started     = false; // true once the user has clicked "Watch Here"
 let hiddenAt    = 0;     // timestamp when page was last hidden
 let pauseTimer  = null;  // setTimeout handle; sets needsResync after threshold
@@ -149,6 +157,7 @@ function resync() {
 
 // Called by each backend when playback state changes to 'playing' or 'paused'.
 function onStateChange(s) {
+  controls?.updatePauseState(s);
   if (s === 'playing') {
     clearTimeout(pauseTimer);
     pauseTimer = null;
@@ -173,8 +182,18 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+function goToNext() {
+  advance.cancel();
+  postNextEp(state.currentSource);
+}
+
+function goToPrev() {
+  advance.cancel();
+  postPrevEp(state.currentSource);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-  initControls(state, advance, reportProgress);
+  controls = initControls(state, advance, reportProgress, goToPrev, goToNext);
 
   // Apply player state after htmx swaps in a new #player-state fragment.
   document.addEventListener('htmx:afterSwap', e => {

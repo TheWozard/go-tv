@@ -23,6 +23,8 @@ func (h *PlayerHandler) Mount(r chi.Router) {
 	r.Get("/state", h.stateHandler)
 	r.Post("/progress", h.progressHandler)
 	r.Post("/next", h.nextHandler)
+	r.Post("/prev-ep", h.prevEpHandler)
+	r.Post("/next-ep", h.nextEpHandler)
 }
 
 func (h *PlayerHandler) stateHandler(w http.ResponseWriter, r *http.Request) {
@@ -62,6 +64,42 @@ func (h *PlayerHandler) nextHandler(w http.ResponseWriter, r *http.Request) {
 		components.SeriesEndedState().Render(r.Context(), w)
 		return
 	}
+	seg := h.channel.CurrentSegment()
+	streamURL := ""
+	if seg.Source.Kind == channel.SourceKindJellyfin {
+		streamURL = h.jellyfin.StreamURL(seg.Source.ID)
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := components.PlayerState(seg.Source, seg.Clip.Start, seg.Clip.End, streamURL).Render(r.Context(), w); err != nil {
+		h.logger.Error("render player state", err)
+	}
+}
+
+func (h *PlayerHandler) nextEpHandler(w http.ResponseWriter, r *http.Request) {
+	source, ok := sourceFromForm(r)
+	if !ok {
+		http.Error(w, "invalid source", http.StatusBadRequest)
+		return
+	}
+	_ = h.channel.NextEpisode(source) // if no next episode, current segment is re-rendered from its start
+	seg := h.channel.CurrentSegment()
+	streamURL := ""
+	if seg.Source.Kind == channel.SourceKindJellyfin {
+		streamURL = h.jellyfin.StreamURL(seg.Source.ID)
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := components.PlayerState(seg.Source, seg.Clip.Start, seg.Clip.End, streamURL).Render(r.Context(), w); err != nil {
+		h.logger.Error("render player state", err)
+	}
+}
+
+func (h *PlayerHandler) prevEpHandler(w http.ResponseWriter, r *http.Request) {
+	source, ok := sourceFromForm(r)
+	if !ok {
+		http.Error(w, "invalid source", http.StatusBadRequest)
+		return
+	}
+	_ = h.channel.PrevEpisode(source) // if no prev episode exists, current segment is re-rendered from its start
 	seg := h.channel.CurrentSegment()
 	streamURL := ""
 	if seg.Source.Kind == channel.SourceKindJellyfin {

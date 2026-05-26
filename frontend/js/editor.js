@@ -31,11 +31,30 @@ function updateNavSelection() {
     el.classList.toggle('selected', el.dataset.seriesId === detailId));
 }
 
-document.addEventListener('DOMContentLoaded', initSortable);
+function scrollToActive() {
+  const active = document.querySelector('#series-detail-wrap .card.active');
+  if (active) active.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+}
+
+let savedDetailScroll = 0;
+
+document.addEventListener('htmx:beforeSwap', e => {
+  if (e.detail.target?.id === 'series-list') {
+    savedDetailScroll = document.getElementById('series-detail-wrap')?.scrollTop ?? 0;
+  }
+});
+
+document.addEventListener('DOMContentLoaded', () => { initSortable(); scrollToActive(); });
 document.addEventListener('htmx:afterSwap', e => {
   const targetId = e.detail.target?.id;
   if (targetId === 'series-list' || targetId === 'series-detail-wrap' || targetId === 'series-detail') {
     initSortable();
+  }
+  if (targetId === 'series-list') {
+    const wrap = document.getElementById('series-detail-wrap');
+    if (wrap) wrap.scrollTop = savedDetailScroll;
+  } else if (targetId === 'series-detail-wrap' || targetId === 'series-detail') {
+    scrollToActive();
   }
   updateNavSelection();
 });

@@ -47,6 +47,31 @@ func NewAnonymousSeries(mode SeriesMode, seasons ...Season) *Series {
 	return NewSeries("anonymous", mode, seasons...)
 }
 
+// LastSegmentBefore returns the last playable segment strictly before (seasonIdx, episodeIdx).
+// Disabled seasons are skipped. Returns false if no earlier segment exists.
+func (sr *Series) LastSegmentBefore(seasonIdx, episodeIdx int) (Segment, bool) {
+	if seasonIdx < len(sr.Seasons) && !sr.Seasons[seasonIdx].Disabled {
+		sn := sr.Seasons[seasonIdx]
+		for i := episodeIdx - 1; i >= 0; i-- {
+			if clip, ok := sn.Episodes[i].FirstClip(); ok {
+				return Segment{Source: sn.Episodes[i].Source, Clip: clip}, true
+			}
+		}
+	}
+	for si := seasonIdx - 1; si >= 0; si-- {
+		sn := sr.Seasons[si]
+		if sn.Disabled {
+			continue
+		}
+		for i := len(sn.Episodes) - 1; i >= 0; i-- {
+			if clip, ok := sn.Episodes[i].FirstClip(); ok {
+				return Segment{Source: sn.Episodes[i].Source, Clip: clip}, true
+			}
+		}
+	}
+	return Segment{}, false
+}
+
 // FirstSegmentFrom returns the first playable segment starting from (seasonIdx, episodeIdx).
 //
 // In LoopMode, once the remaining seasons are exhausted the search wraps back to
