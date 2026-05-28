@@ -8,39 +8,38 @@ import (
 )
 
 templ Player(source channel.Source, position, stopAt time.Duration, player config.Player, jellyfin config.Jellyfin) {
-	@Layout("go-tv", "player") {
-		<body>
-			@PlayerState(source, position, stopAt, jellyfinStreamURL(source, jellyfin))
-			<div id="start-screen">
-				<button class="start-btn primary" onclick="startHere()">@IconPlay() Watch Here</button>
-				<a href="/edit">Edit</a>
-			</div>
-			<div
-				id="player-wrapper"
-				data-skip-interval-ms={ fmt.Sprintf("%d", player.SkipInterval.Duration().Milliseconds()) }
-				data-progress-rate-ms={ fmt.Sprintf("%d", player.ProgressRate.Duration().Milliseconds()) }
-				data-advance-retry-ms={ fmt.Sprintf("%d", player.AdvanceRetry.Duration().Milliseconds()) }
-				data-resync-threshold-ms={ fmt.Sprintf("%d", player.ResyncThreshold.Duration().Milliseconds()) }
-			>
-				<div id="player"></div>
-				<div id="overlay">
-					<a id="edit-btn" href="/edit">Edit</a>
-					<div id="skip-left" class="skip-indicator"></div>
-					<div id="skip-right" class="skip-indicator"></div>
-					<button id="prev-ep-btn" class="ep-btn">⏮</button>
-					<button id="seek-back-btn" class="seek-btn"></button>
-					<button id="seek-fwd-btn" class="seek-btn"></button>
-					<button id="next-ep-btn" class="ep-btn">⏭</button>
-<div id="progress-bar-wrap">
-						<div id="progress-bar-track">
-							<div id="progress-bar-fill"></div>
-							<div id="progress-bar-stop"></div>
-						</div>
+	@Layout("go-tv", "player", "") {
+		@PlayerState(source, position, stopAt, jellyfinStreamURL(source, jellyfin))
+		<div id="start-screen">
+			<button class="start-btn primary" onclick="startHere()">@IconPlay() Watch Here</button>
+			<a href="/edit">Edit</a>
+		</div>
+		<div
+			id="player-wrapper"
+			data-skip-interval-ms={ fmt.Sprintf("%d", player.SkipInterval.Duration().Milliseconds()) }
+			data-progress-rate-ms={ fmt.Sprintf("%d", player.ProgressRate.Duration().Milliseconds()) }
+			data-advance-retry-ms={ fmt.Sprintf("%d", player.AdvanceRetry.Duration().Milliseconds()) }
+			data-resync-threshold-ms={ fmt.Sprintf("%d", player.ResyncThreshold.Duration().Milliseconds()) }
+		>
+			<div id="player"></div>
+			<div id="skip-left" class="skip-indicator"></div>
+			<div id="skip-right" class="skip-indicator"></div>
+			<div id="overlay">
+				<button id="reload-btn" onclick="location.reload()">@IconRefreshCw()</button>
+				<a id="edit-btn" href="/edit">@IconPencil()</a>
+				<button id="prev-ep-btn" class="ep-btn">@IconSkipBack()</button>
+				<button id="seek-back-btn" class="seek-btn"></button>
+				<button id="seek-fwd-btn" class="seek-btn"></button>
+				<button id="next-ep-btn" class="ep-btn">@IconSkipForward()</button>
+			<div id="progress-bar-wrap">
+					<div id="progress-bar-track">
+						<div id="progress-bar-fill"></div>
+						<div id="progress-bar-stop"></div>
 					</div>
 				</div>
 			</div>
-			<script src="https://www.youtube.com/iframe_api" async></script>
-		</body>
+		</div>
+		<script src="https://www.youtube.com/iframe_api" async></script>
 	}
 }
 

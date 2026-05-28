@@ -1,41 +1,14 @@
-import { debounce } from 'lodash-es';
+import { iconRewind, iconFastForward } from '../icons.js';
 
 // initControls wires up the overlay and keyboard shortcuts.
 // state is a shared object { player, currentStop } mutated by player.js.
 // advance() is called when playback should move to the next video.
 export function initControls(state, advance, reportProgress, goToPrev, goToNext) {
   const overlay = document.getElementById('overlay');
-  const editBtn = document.getElementById('edit-btn');
   const progressWrap = document.getElementById('progress-bar-wrap');
   const progressFill = document.getElementById('progress-bar-fill');
   const progressStop = document.getElementById('progress-bar-stop');
   const skipMs = parseInt(document.getElementById('player-wrapper')?.dataset.skipIntervalMs, 10) || 10_000;
-
-  // Control visibility (cursor, progress bar, fullscreen button).
-  const HIDE_DELAY_MS = 3000;
-
-  function showControls() {
-    overlay.style.cursor = 'default';
-    progressWrap?.classList.add('visible');
-    editBtn?.classList.add('visible');
-  }
-
-  const hideControls = debounce(() => {
-    overlay.style.cursor = 'none';
-    progressWrap?.classList.remove('visible');
-    editBtn?.classList.remove('visible');
-  }, HIDE_DELAY_MS);
-
-  overlay.addEventListener('mousemove', () => {
-    showControls();
-    hideControls();
-  });
-
-  // Show controls on touch so they're visible before the tap action fires.
-  overlay.addEventListener('touchstart', () => {
-    showControls();
-    hideControls();
-  }, { passive: true });
 
   // Seek to a position based on a clientX coordinate over the progress bar.
   function seekFromX(clientX) {
@@ -110,8 +83,8 @@ export function initControls(state, advance, reportProgress, goToPrev, goToNext)
   const skipSecs    = Math.round(skipMs / 1000);
   if (skipLeft)    skipLeft.textContent    = `« ${skipSecs}s`;
   if (skipRight)   skipRight.textContent   = `${skipSecs}s »`;
-  if (seekBackBtn) seekBackBtn.textContent = `« ${skipSecs}s`;
-  if (seekFwdBtn)  seekFwdBtn.textContent  = `${skipSecs}s »`;
+  if (seekBackBtn) seekBackBtn.innerHTML = `${iconRewind()} ${skipSecs}s`;
+  if (seekFwdBtn)  seekFwdBtn.innerHTML  = `${skipSecs}s ${iconFastForward()}`;
 
   function flashSkip(dir) {
     const el = dir > 0 ? skipRight : skipLeft;

@@ -12,6 +12,6 @@
   },
   "devDependencies": {
     "esbuild": "^0.28.0",
-    "lucide-static": "^1.16.0"
+    "lucide-static": "^1.17.0"
   }
 }

@@ -63,7 +63,7 @@ function applyState(sourceKind, sourceId, seconds, stopSeconds, streamURL) {
   if (sameSource) {
     if (state.player) {
       const ended = state.player.getState() === 'ended';
-      if (ended || Math.abs(state.player.getCurrentTime() - seconds) > 5) {
+      if (ended || seconds - state.player.getCurrentTime() > 5) {
         // Cancel the throttle so the ENDED that fires after seeking can trigger advance().
         advance.cancel();
         state.player.seekTo(seconds);

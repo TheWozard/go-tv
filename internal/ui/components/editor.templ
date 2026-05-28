@@ -122,10 +122,8 @@ templ EditorHeader(state *channel.State) {
 }
 
 templ Editor(series []*channel.Series, state *channel.State, active channel.Source, activeAt time.Duration, jellyfinBaseURL string) {
-	@Layout("go-tv / edit", "editor") {
-		<body class="editor">
-			@EditorHeader(state)
-			@VideoList(series, state, active, activeAt, jellyfinBaseURL)
-		</body>
+	@Layout("go-tv / edit", "editor", "editor") {
+		@EditorHeader(state)
+		@VideoList(series, state, active, activeAt, jellyfinBaseURL)
 	}
 }

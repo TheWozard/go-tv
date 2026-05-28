@@ -47,14 +47,14 @@ templ VideoCard(v channel.Episode, isActive bool, activeAt time.Duration, stateS
 							href={ templ.URL("https://www.youtube.com/watch?v=" + src.ID) }
 							target="_blank"
 							rel="noopener"
-						>@IconArrowUpRight() { src.ID }</a>
+						>@IconExternalLink() { src.ID }</a>
 					} else if src.Kind == channel.SourceKindJellyfin {
 						<a
 							class="vid-id jf-link text-muted"
 							href={ templ.URL(jellyfinBaseURL + "/web/index.html#!/details?id=" + src.ID) }
 							target="_blank"
 							rel="noopener"
-						>@IconArrowUpRight() { src.ID }</a>
+						>@IconExternalLink() { src.ID }</a>
 					} else {
 						<span class="vid-id text-muted">{ src.ID }</span>
 					}
