@@ -1,6 +1,9 @@
-binary := "go-tv"
-image  := "go-tv"
-tar    := "go-tv.tar"
+set dotenv-load
+
+binary   := "go-tv"
+image    := "go-tv"
+tar      := "go-tv.tar"
+registry := env("REGISTRY", "localhost:8010")
 
 # Build the production Go binary (linux/amd64) after generating templates and bundling JS
 build: bundle generate
@@ -22,6 +25,11 @@ dev: generate
 # Watch JS source files and rebuild bundles on change (run alongside dev)
 dev-js:
     npm run watch
+
+# Build and push the Docker image to the registry defined in .env
+docker-push: docker-build
+    docker tag {{image}} {{registry}}/{{image}}
+    docker push {{registry}}/{{image}}
 
 # Build and push a Docker image, then export it to a tar file
 docker-export: docker-build

@@ -30,3 +30,5 @@ static
 
 # generated templ output (regenerate with: templ generate ./internal/ui/...)
 *_templ.go
+
+.env
