@@ -58,3 +58,11 @@ export function iconRefreshCw() {
 export function iconPencil() {
   return `<svg ${ICON_ATTRS}><use href="/icons.svg#icon-pencil"></use></svg>`;
 }
+
+export function iconCaptions() {
+  return `<svg ${ICON_ATTRS}><use href="/icons.svg#icon-captions"></use></svg>`;
+}
+
+export function iconCaptionsOff() {
+  return `<svg ${ICON_ATTRS}><use href="/icons.svg#icon-captions-off"></use></svg>`;
+}

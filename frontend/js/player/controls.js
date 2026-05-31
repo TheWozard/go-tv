@@ -1,4 +1,4 @@
-import { iconRewind, iconFastForward } from '../icons.js';
+import { iconRewind, iconFastForward, iconCaptions, iconCaptionsOff } from '../icons.js';
 
 // initControls wires up the overlay and keyboard shortcuts.
 // state is a shared object { player, currentStop } mutated by player.js.
@@ -114,11 +114,19 @@ export function initControls(state, advance, reportProgress, goToPrev, goToNext)
 
   const prevEpBtn = document.getElementById('prev-ep-btn');
   const nextEpBtn = document.getElementById('next-ep-btn');
+  const ccBtn     = document.getElementById('cc-btn');
 
   seekBackBtn?.addEventListener('click', e => { e.stopPropagation(); doSkip(-1); });
   seekFwdBtn?.addEventListener('click',  e => { e.stopPropagation(); doSkip(1); });
   prevEpBtn?.addEventListener('click',   e => { e.stopPropagation(); goToPrev?.(); });
   nextEpBtn?.addEventListener('click',   e => { e.stopPropagation(); goToNext?.(); });
+  ccBtn?.addEventListener('click', e => {
+    e.stopPropagation();
+    if (!state.player?.toggleCC) return;
+    const enabled = state.player.toggleCC();
+    ccBtn.innerHTML = enabled ? iconCaptions() : iconCaptionsOff();
+    ccBtn.classList.toggle('active', enabled);
+  });
 
   // Double-tap left/right halves of the overlay to skip; single tap to play/pause.
   // touchHandled blocks the synthetic click that browsers fire after touchend.
@@ -176,6 +184,9 @@ export function initControls(state, advance, reportProgress, goToPrev, goToNext)
   return {
     updatePauseState(s) {
       overlay.classList.toggle('paused', s === 'paused');
+    },
+    resetCC() {
+      if (ccBtn) { ccBtn.innerHTML = iconCaptionsOff(); ccBtn.classList.remove('active'); }
     },
   };
 }

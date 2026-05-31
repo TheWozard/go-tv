@@ -164,25 +164,30 @@ body {
   display: block;
 }
 
+#cc-btn,
 #reload-btn,
 #edit-btn {
   position: absolute;
-  top: 12px;
+  top: 8px;
   background: none;
   border: none;
   color: rgba(255, 255, 255, 0.6);
-  font-size: 1.1rem;
+  font-size: 2rem;
   cursor: pointer;
-  padding: 8px;
+  padding: 16px;
   text-decoration: none;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-#reload-btn { right: 44px; }
+#cc-btn     { right: 136px; }
+#reload-btn { right: 72px; }
 #edit-btn   { right: 8px; }
 
+#cc-btn.active { color: #fff; }
+
+#cc-btn:hover,
 #reload-btn:hover,
 #edit-btn:hover {
   color: #fff;
@@ -194,11 +199,11 @@ body {
   background: rgba(0, 0, 0, 0.5);
   border: none;
   border-radius: 50%;
-  width: 72px;
-  height: 72px;
+  width: 120px;
+  height: 120px;
   color: #fff;
   font-family: system-ui, sans-serif;
-  font-size: 0.7rem;
+  font-size: 0.9rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   cursor: pointer;
@@ -206,8 +211,12 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 4px;
   transition: background 0.15s;
+}
+
+.seek-btn .icon {
+  font-size: 2rem;
 }
 
 .seek-btn:hover {
@@ -231,10 +240,10 @@ body {
   background: rgba(0, 0, 0, 0.45);
   border: none;
   border-radius: 50%;
-  width: 56px;
-  height: 56px;
+  width: 96px;
+  height: 96px;
   color: #fff;
-  font-size: 1.4rem;
+  font-size: 2.5rem;
   cursor: pointer;
   display: flex;
   align-items: center;

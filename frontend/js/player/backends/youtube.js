@@ -14,10 +14,12 @@ export function createYoutubeBackend(elementId, videoId, startSeconds, { onEnded
   // transitioning out of ENDED state.
   let pendingPlay = false;
 
+  let ccEnabled = false;
+
   return new Promise(resolve => {
     const ytPlayer = new YT.Player(target, {
       videoId,
-      playerVars: { start: Math.floor(startSeconds), autoplay: 1, controls: 0 },
+      playerVars: { start: Math.floor(startSeconds), autoplay: 1, controls: 0, cc_load_policy: 0 },
       events: {
         onReady() {
           resolve({
@@ -37,6 +39,12 @@ export function createYoutubeBackend(elementId, videoId, startSeconds, { onEnded
             loadVideo(vid, start) {
               pendingPlay = true;
               ytPlayer.loadVideoById({ videoId: vid, startSeconds: Math.floor(start) });
+            },
+            toggleCC() {
+              ccEnabled = !ccEnabled;
+              if (ccEnabled) ytPlayer.loadModule('captions');
+              else           ytPlayer.unloadModule('captions');
+              return ccEnabled;
             },
             destroy() { ytPlayer.destroy(); },
           });

@@ -75,6 +75,7 @@ function applyState(sourceKind, sourceId, seconds, stopSeconds, streamURL) {
 
   // Source changed — cancel any pending advance and invalidate in-flight loads.
   // Clear resync state; the new backend will re-arm it via onStateChange.
+  controls?.resetCC();
   advance.cancel();
   clearTimeout(pauseTimer);
   pauseTimer = null;
