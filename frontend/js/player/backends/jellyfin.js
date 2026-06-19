@@ -13,11 +13,16 @@ export function createJellyfinBackend(elementId, streamURL, startSeconds, stopSe
       const onPlay       = () => onStateChange?.('playing');
       const onPause      = () => onStateChange?.('paused');
       const onVideoError = () => { console.error('[jellyfin] video error', video.error); onError(); };
+      // The overlay sits on top with pointer-events:none while playing, so clicks
+      // fall through to the <video> element. Toggle pause/play here so the overlay
+      // becomes interactive (pointer-events:auto) once the player pauses.
+      const onVideoClick = () => { if (video.paused) video.play().catch(() => {}); else video.pause(); };
       video.addEventListener('ended', onEnded);
       video.addEventListener('error', onVideoError);
       video.addEventListener('play',  onPlay);
       video.addEventListener('pause', onPause);
-      const backend = wrap(video, hls, stopSeconds, { onEnded, onError: onVideoError, onPlay, onPause });
+      video.addEventListener('click', onVideoClick);
+      const backend = wrap(video, hls, stopSeconds, { onEnded, onError: onVideoError, onPlay, onPause, onVideoClick });
       video.currentTime = startSeconds;
       backend.play();
       resolve(backend);
@@ -39,7 +44,7 @@ export function createJellyfinBackend(elementId, streamURL, startSeconds, stopSe
   });
 }
 
-function wrap(video, hls, stopSeconds, { onEnded, onError, onPlay, onPause }) {
+function wrap(video, hls, stopSeconds, { onEnded, onError, onPlay, onPause, onVideoClick }) {
   // Stop buffering fragments that start at or beyond the clip end.
   if (hls && stopSeconds > 0) {
     hls.on(Hls.Events.FRAG_LOADING, (_, data) => {
@@ -72,6 +77,7 @@ function wrap(video, hls, stopSeconds, { onEnded, onError, onPlay, onPause }) {
       video.removeEventListener('error',  onError);
       video.removeEventListener('play',   onPlay);
       video.removeEventListener('pause',  onPause);
+      video.removeEventListener('click',  onVideoClick);
       hls?.destroy();
       video.src = '';
     },
