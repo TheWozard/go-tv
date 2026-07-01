@@ -21,14 +21,8 @@ RUN templ generate ./internal/ui/...
 RUN CGO_ENABLED=0 go build -ldflags="-w" -o go-tv .
 
 # ---- final image ----
-FROM alpine:latest
+FROM gcr.io/distroless/static-debian12
 
-RUN apk --no-cache add ca-certificates iptables
+COPY --from=builder /app/go-tv /go-tv
 
-WORKDIR /root/
-
-COPY --from=builder /app/go-tv .
-
-EXPOSE 443
-
-ENTRYPOINT ["./go-tv"]
+ENTRYPOINT ["/go-tv"]
