@@ -1,39 +1,49 @@
 package main
 
 import (
-	"context"
 	"embed"
 	"flag"
 	"io/fs"
 	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
+	"runtime/debug"
 	"time"
 
+	"github.com/TheWozard/go-yaml-config"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
 	"go-tv/internal/api"
+	"go-tv/internal/app"
 	"go-tv/internal/channel"
-	"go-tv/internal/config"
 	"go-tv/internal/store"
 )
 
 //go:embed static
 var staticFiles embed.FS
 
+// vcsRevision returns the git commit the binary was built from, as stamped
+// automatically by the Go toolchain, or "unknown" if unavailable.
+func vcsRevision() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "unknown"
+	}
+	for _, s := range info.Settings {
+		if s.Key == "vcs.revision" {
+			return s.Value
+		}
+	}
+	return "unknown"
+}
+
 func main() {
 	configPath := flag.String("config", "./config.yaml", "path to config file")
 	flag.Parse()
 
-	cfg, err := config.Load(*configPath)
-	if err != nil {
-		config.Logger{Level: "info"}.New().Error("failed to load config", err)
-		os.Exit(1)
-	}
-
+	cfg := config.MustLoad[app.Config](*configPath)
 	logger := cfg.Logger.New()
+	logger.Info("starting", "version", vcsRevision())
 
 	serFiles, err := store.LoadSeriesDir(cfg.SeriesDir)
 	if err != nil {
@@ -49,7 +59,7 @@ func main() {
 	schedule := channel.NewSchedule(series...)
 	currentState := store.LoadState(cfg.StatePath, schedule)
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := config.SignalContext()
 	defer stop()
 
 	r := chi.NewRouter()
@@ -67,7 +77,7 @@ func main() {
 	}
 	r.Handle("/*", http.FileServer(http.FS(sub)))
 
-	if err = cfg.GetServerListener().Listen(ctx, r, logger); err != nil {
+	if err = cfg.Tailscale.Listen(ctx, r, logger, cfg.Server); err != nil {
 		logger.Error("server error", err)
 		os.Exit(1)
 	}

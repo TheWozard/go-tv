@@ -8,12 +8,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"go-tv/internal/config"
+	"go-tv/internal/app"
 )
 
 // StreamHandler proxies HLS requests to Jellyfin, keeping the API key server-side.
 type StreamHandler struct {
-	jellyfin config.Jellyfin
+	jellyfin app.Jellyfin
 	client   *http.Client
 }
 

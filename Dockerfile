@@ -3,7 +3,7 @@ FROM golang:alpine AS builder
 
 WORKDIR /app
 
-RUN apk add --no-cache nodejs npm imagemagick imagemagick-svg bash
+RUN apk add --no-cache nodejs npm imagemagick imagemagick-svg bash git
 RUN go install github.com/a-h/templ/cmd/templ@v0.3.1001
 
 COPY package.json package-lock.json ./
@@ -13,6 +13,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
+RUN git config --global --add safe.directory /app
 RUN npm run build && ./scripts/gen-favicon.sh
 
 RUN templ generate ./internal/ui/...

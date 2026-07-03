@@ -27,9 +27,11 @@ import (
 	"strings"
 	"time"
 
+	"go-tv/internal/app"
 	"go-tv/internal/channel"
-	"go-tv/internal/config"
 	"go-tv/internal/store"
+
+	"github.com/TheWozard/go-yaml-config"
 )
 
 type jfItem struct {
@@ -83,7 +85,7 @@ func main() {
 	}
 	query := strings.Join(flag.Args(), " ")
 
-	cfg, err := config.Load(*configPath)
+	cfg, err := config.Load[app.Config](*configPath)
 	if err != nil {
 		slog.Error("failed to load config", "err", err)
 		os.Exit(1)
@@ -140,7 +142,7 @@ func main() {
 	fmt.Printf("created series %q (%d episode(s)) → %s\n", name, len(episodes), path)
 }
 
-func search(jf config.Jellyfin, query string, limit int) []jfItem {
+func search(jf app.Jellyfin, query string, limit int) []jfItem {
 	u, err := url.Parse(jf.URL + "/Items")
 	if err != nil {
 		slog.Error("invalid jellyfin url", "err", err)

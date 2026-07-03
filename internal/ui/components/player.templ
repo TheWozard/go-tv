@@ -2,12 +2,12 @@ package components
 
 import (
 	"fmt"
+	"go-tv/internal/app"
 	"go-tv/internal/channel"
-	"go-tv/internal/config"
 	"time"
 )
 
-templ Player(source channel.Source, position, stopAt time.Duration, player config.Player, jellyfin config.Jellyfin) {
+templ Player(source channel.Source, position, stopAt time.Duration, player app.Player, jellyfin app.Jellyfin) {
 	@Layout("go-tv", "player", "") {
 		@PlayerState(source, position, stopAt, jellyfinStreamURL(source, jellyfin))
 		<div id="start-screen">
@@ -16,10 +16,10 @@ templ Player(source channel.Source, position, stopAt time.Duration, player confi
 		</div>
 		<div
 			id="player-wrapper"
-			data-skip-interval-ms={ fmt.Sprintf("%d", player.SkipInterval.Duration().Milliseconds()) }
-			data-progress-rate-ms={ fmt.Sprintf("%d", player.ProgressRate.Duration().Milliseconds()) }
-			data-advance-retry-ms={ fmt.Sprintf("%d", player.AdvanceRetry.Duration().Milliseconds()) }
-			data-resync-threshold-ms={ fmt.Sprintf("%d", player.ResyncThreshold.Duration().Milliseconds()) }
+			data-skip-interval-ms={ fmt.Sprintf("%d", player.SkipInterval.Milliseconds()) }
+			data-progress-rate-ms={ fmt.Sprintf("%d", player.ProgressRate.Milliseconds()) }
+			data-advance-retry-ms={ fmt.Sprintf("%d", player.AdvanceRetry.Milliseconds()) }
+			data-resync-threshold-ms={ fmt.Sprintf("%d", player.ResyncThreshold.Milliseconds()) }
 		>
 			<div id="player"></div>
 			<div id="skip-left" class="skip-indicator"></div>
@@ -44,7 +44,7 @@ templ Player(source channel.Source, position, stopAt time.Duration, player confi
 	}
 }
 
-func jellyfinStreamURL(source channel.Source, jellyfin config.Jellyfin) string {
+func jellyfinStreamURL(source channel.Source, jellyfin app.Jellyfin) string {
 	if source.Kind != channel.SourceKindJellyfin {
 		return ""
 	}

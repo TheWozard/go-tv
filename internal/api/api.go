@@ -8,23 +8,24 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"go-tv/internal/app"
 	"go-tv/internal/channel"
 	"go-tv/internal/channel/mutation"
-	"go-tv/internal/config"
-	"go-tv/internal/log"
 	"go-tv/internal/store"
 	"go-tv/internal/ui/components"
+
+	"github.com/TheWozard/go-yaml-config/log"
 )
 
-func OpenChannel(r chi.Router, ch *store.ChannelStore, player config.Player, jellyfin config.Jellyfin, logger *log.Logger) {
+func OpenChannel(r chi.Router, ch *store.ChannelStore, player app.Player, jellyfin app.Jellyfin, logger *log.Logger) {
 	s := &Server{channel: ch, player: player, jellyfin: jellyfin, logger: logger}
 	s.Route(r)
 }
 
 type Server struct {
 	channel  *store.ChannelStore
-	player   config.Player
-	jellyfin config.Jellyfin
+	player   app.Player
+	jellyfin app.Jellyfin
 	logger   *log.Logger
 }
 

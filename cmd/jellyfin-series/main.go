@@ -26,9 +26,11 @@ import (
 	"strings"
 	"time"
 
+	"go-tv/internal/app"
 	"go-tv/internal/channel"
-	"go-tv/internal/config"
 	"go-tv/internal/store"
+
+	"github.com/TheWozard/go-yaml-config"
 )
 
 type jfItem struct {
@@ -64,7 +66,7 @@ func main() {
 	}
 	query := strings.Join(flag.Args(), " ")
 
-	cfg, err := config.Load(*configPath)
+	cfg, err := config.Load[app.Config](*configPath)
 	if err != nil {
 		slog.Error("failed to load config", "err", err)
 		os.Exit(1)
@@ -135,7 +137,7 @@ func main() {
 		show.Name, len(channelSeasons), totalEps, path)
 }
 
-func apiGet(jf config.Jellyfin, rawURL string, dest any) {
+func apiGet(jf app.Jellyfin, rawURL string, dest any) {
 	resp, err := jf.HTTPClient().Get(rawURL)
 	if err != nil {
 		slog.Error("request failed", "url", rawURL, "err", err)
@@ -152,7 +154,7 @@ func apiGet(jf config.Jellyfin, rawURL string, dest any) {
 	}
 }
 
-func searchSeries(jf config.Jellyfin, query string) []jfItem {
+func searchSeries(jf app.Jellyfin, query string) []jfItem {
 	u, _ := url.Parse(jf.URL + "/Items")
 	q := u.Query()
 	q.Set("searchTerm", query)
@@ -168,7 +170,7 @@ func searchSeries(jf config.Jellyfin, query string) []jfItem {
 	return result.Items
 }
 
-func fetchSeasons(jf config.Jellyfin, seriesID string) []jfItem {
+func fetchSeasons(jf app.Jellyfin, seriesID string) []jfItem {
 	u, _ := url.Parse(jf.URL + "/Shows/" + seriesID + "/Seasons")
 	q := u.Query()
 	q.Set("Fields", "Name,IndexNumber")
@@ -180,7 +182,7 @@ func fetchSeasons(jf config.Jellyfin, seriesID string) []jfItem {
 	return result.Items
 }
 
-func fetchEpisodes(jf config.Jellyfin, seriesID, seasonID string) []jfItem {
+func fetchEpisodes(jf app.Jellyfin, seriesID, seasonID string) []jfItem {
 	u, _ := url.Parse(jf.URL + "/Shows/" + seriesID + "/Episodes")
 	q := u.Query()
 	q.Set("seasonId", seasonID)

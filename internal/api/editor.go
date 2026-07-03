@@ -8,19 +8,20 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"go-tv/internal/app"
 	"go-tv/internal/channel"
 	"go-tv/internal/channel/mutation"
 	"go-tv/internal/client/sponsorblock"
-	"go-tv/internal/config"
-	"go-tv/internal/log"
 	"go-tv/internal/store"
 	"go-tv/internal/ui/components"
+
+	"github.com/TheWozard/go-yaml-config/log"
 )
 
 // EditorHandler serves HTMX endpoints used by the editor page.
 type EditorHandler struct {
 	channel  *store.ChannelStore
-	jellyfin config.Jellyfin
+	jellyfin app.Jellyfin
 	logger   *log.Logger
 }
 
