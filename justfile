@@ -5,9 +5,9 @@ image    := "go-tv"
 tar      := "go-tv.tar"
 registry := env("REGISTRY", "localhost:8010")
 
-# Build the production Go binary (linux/amd64) after generating templates and bundling JS
-build: bundle generate
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o {{binary}} main.go
+# Build the production Go binary (linux/amd64) after generating templates, icons, and bundling JS
+build: bundle icons generate
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o {{binary}} .
 
 # Install npm dependencies and produce minified JS bundles in static/
 bundle:
@@ -36,8 +36,8 @@ docker-export: docker-build
     docker save {{image}} -o {{tar}}
     chmod 644 {{tar}}
 
-# Build a linux/amd64 Docker image
-docker-build:
+# Build a linux/amd64 Docker image from the locally built binary
+docker-build: build
     docker build --platform linux/amd64 -t {{image}} .
 
 # Run the Docker image locally on port 8080
